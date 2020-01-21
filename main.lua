@@ -62,6 +62,7 @@ function love.load()
     player.red = math.random(200, 800)/1000
     player.green = math.random(200, 800)/1000
     player.blue = math.random(200, 800)/1000
+    player.planet = i
     table.insert(players, player)
   end
 
@@ -93,6 +94,9 @@ function love.update(dt)
   if turn > #players then
     turn = 1
   end
+  if #players == 0 then
+    love.event.quit("restart")
+  end
   local player = players[turn]
 
   for i = 1, #planets, 1 do
@@ -102,7 +106,7 @@ function love.update(dt)
         local crater = craters[j]
         for k = 1, #players, 1 do
           local player = players[k]
-          if circleRectRotCollision(crater, player) then
+          if player ~= nil and circleRectRotCollision(crater, player) then
             explode(ball.x, ball.y, 7, 10, 100, 150, -100, 100, player.red, player.green, player.blue, 50)
             table.remove(players, i)
             ball.isThrown = false
@@ -116,23 +120,33 @@ function love.update(dt)
     end
   end
 
-  if player.rot > 2*math.pi then
-    player.rot = 0
+  if turn > #players then
+    turn = 1
   end
-  temporary_radius = planets[turn].r + player.h    -- makes a temporary radius equal to the radius of the planet + the height of the player
+  if #players == 0 then
+    love.event.quit("restart")
+  end
+
+  for i = 1, #players, 1 do
+    local player = players[i]
+    if player.rot > 2*math.pi then
+      player.rot = 0
+    end
+  end
+  temporary_radius = planets[player.planet].r + player.h    -- makes a temporary radius equal to the radius of the planet + the height of the player
   if love.keyboard.isDown("a") then   -- rotate the player counter clockwise around the planet
-    if #planets[turn].craters == 0 then    -- if there are no craters, just move
+    if #planets[player.planet].craters == 0 then    -- if there are no craters, just move
       player.rot = player.rot - 2*dt
     else
 
       move = true   -- start by saying you're able to move
 
-      for i = 1, #planets[turn].craters, 1 do    -- go through each crater on the planet
-        local crater = planets[turn].craters[i]
+      for i = 1, #planets[player.planet].craters, 1 do    -- go through each crater on the planet
+        local crater = planets[player.planet].craters[i]
 
         new_point = {}
-        new_point.x = (planets[turn].r * math.cos(player.rot - 2*dt)) + planets[turn].x   -- calculate your new coordinate (at left foot of player)
-        new_point.y = (planets[turn].r * math.sin(player.rot - 2*dt)) + planets[turn].y
+        new_point.x = (planets[player.planet].r * math.cos(player.rot - 2*dt)) + planets[player.planet].x   -- calculate your new coordinate (at left foot of player)
+        new_point.y = (planets[player.planet].r * math.sin(player.rot - 2*dt)) + planets[player.planet].y
 
         if distanceBetween(new_point, crater) < crater.r then   -- check if it's inside the crater
           move = false    -- if it is, set move to false
@@ -145,18 +159,18 @@ function love.update(dt)
     end
 
   elseif love.keyboard.isDown("d") then   -- rotate the player clockwise around the planet (same as going counter clockwise)
-    if #planets[turn].craters == 0 then
+    if #planets[player.planet].craters == 0 then
       player.rot = player.rot + 2*dt
     else
 
       move = true
 
-      for i = 1, #planets[turn].craters, 1 do
-        local crater = planets[turn].craters[i]
+      for i = 1, #planets[player.planet].craters, 1 do
+        local crater = planets[player.planet].craters[i]
 
         new_point = {}
-        new_point.x = (planets[turn].r * math.cos(player.rot + 2*dt + (4*math.pi/planets[turn].r))) + planets[turn].x    -- calculates right foot of player if moved
-        new_point.y = (planets[turn].r * math.sin(player.rot + 2*dt + (4*math.pi/planets[turn].r))) + planets[turn].y
+        new_point.x = (planets[player.planet].r * math.cos(player.rot + 2*dt + (4*math.pi/planets[player.planet].r))) + planets[player.planet].x    -- calculates right foot of player if moved
+        new_point.y = (planets[player.planet].r * math.sin(player.rot + 2*dt + (4*math.pi/planets[player.planet].r))) + planets[player.planet].y
 
         if distanceBetween(new_point, crater) < crater.r then
           move = false
@@ -178,8 +192,8 @@ function love.update(dt)
   -- elseif love.keyboard.isDown("d") then
   --   player.x = player.x + 2
 
-  player.x = (temporary_radius * math.cos(player.rot)) + planets[turn].x   -- move the player around the planet based on its rotation
-  player.y = (temporary_radius * math.sin(player.rot)) + planets[turn].y
+  player.x = (temporary_radius * math.cos(player.rot)) + planets[player.planet].x   -- move the player around the planet based on its rotation
+  player.y = (temporary_radius * math.sin(player.rot)) + planets[player.planet].y
 
  if ball.isThrown then    -- run when the ball is thrown
 
@@ -196,6 +210,13 @@ function love.update(dt)
         cooldown_timer = 0
         turn = turn + 1
         hit = true
+
+        if turn > #players then
+          turn = 1
+        end
+        if #players == 0 then
+          love.event.quit("restart")
+        end
       end
       ball.r = temp_r
     end
@@ -260,6 +281,13 @@ function love.update(dt)
             cooldown_timer = 0
             turn = turn + 1
             hit = true
+
+            if turn > #players then
+              turn = 1
+            end
+            if #players == 0 then
+              love.event.quit("restart")
+            end
           end
           crater.r = temp_r
         end
@@ -336,11 +364,11 @@ end
 function love.draw()
   g.setBackgroundColor((1 - random_color.r)/2, (1 - random_color.g)/2, (1 - random_color.b)/2)    -- draw the opposite color of the planets as the background
 
-  if hit then
-    g.setColor(0, 0, 0)
-    g.rectangle("fill", 0, 0, width, height)
-    -- hit = false
-  end
+  -- if hit then
+  --   g.setColor(0, 0, 0)
+  --   g.rectangle("fill", 0, 0, width, height)
+  --   -- hit = false
+  -- end
 
   -- g.setColor(random_color.r, random_color.b, random_color.g)
   -- g.setFont(myFont)
@@ -374,6 +402,11 @@ function love.draw()
     g.translate(-player.x, -player.y)
     g.rectangle("fill", player.x, player.y, player.w, player.h)   -- draw the player
     g.origin()
+
+    -- local points = {}
+    -- g.setColor(0, 0, 0)
+    -- g.setPointSize(1)
+    -- g.points(drawCollisionPoints(points, player))
   end
 
   if ball.isThrown then
@@ -464,6 +497,8 @@ function circleRectRotCollision(circle, rect)
   resolution = 2
   local rect_points = {}
 
+  rect.rot = rect.rot + math.pi/2
+
   for i = 0, rect.w*2, resolution do
     local point = {}
     point.x = rect.x + (i * math.cos(rect.rot + math.pi/2))
@@ -501,14 +536,18 @@ function circleRectRotCollision(circle, rect)
     point.x = rect_points[i]
     point.y = rect_points[i+1]
     if distanceBetween(point, circle) < circle.r then
+      rect.rot = rect.rot - math.pi/2
       return true
     end
   end
+  rect.rot = rect.rot - math.pi/2
   return false
 end
 
-function drawCollisionPoints(points_table, circle, rect)
+function drawCollisionPoints(points_table, rect)
   resolution = 2
+
+  rect.rot = rect.rot + math.pi/2
 
   for i = 0, rect.w*2, resolution do
     local point = {}
@@ -542,6 +581,7 @@ function drawCollisionPoints(points_table, circle, rect)
     table.insert(points_table, opposite_point.y)
   end
 
+  rect.rot = rect.rot - math.pi/2
   return points_table
 end
 
