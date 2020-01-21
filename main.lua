@@ -8,6 +8,8 @@ function love.load()
 
   throwing_multiplier = 0.2   -- this will affect the speed of the projectile
 
+  num_players = 6
+
   math.randomseed(os.time())    -- seeding random number generation
   random_color = {}
   random_color.r = math.random(300, 700)/1000    -- making a random color which will be the color of the planets
@@ -33,33 +35,35 @@ function love.load()
   end
 
   planets = {}
-  num_planets = math.floor(math.random(4, 6))   -- generate between 2 and 4 planets
+  num_planets = math.floor(math.random(num_players + 2, num_players + 4))   -- generate 2 to 4 more planets than players
 
   avaiable_zones = zones
-  for i = 1, num_planets, 1 do
+  for i = 1, num_planets, 1 do    -- make planets
     num = math.random(1, #avaiable_zones)   -- pick a random zone and then take it out of the pool
     picked_zone = avaiable_zones[num]
     table.remove(avaiable_zones, num)
 
     local planet = {}
-    planet.r = math.random(20, 90)    -- make a new planet and place it within that random zone
+    planet.r = math.random(30, 70)    -- make a new planet and place it within that random zone
     planet.x = math.random(picked_zone.x + planet.r, (picked_zone.x + picked_zone.width) - planet.r)
     planet.y = math.random(picked_zone.y + planet.r, (picked_zone.y + picked_zone.height) - planet.r)
     planet.craters = {}
     table.insert(planets, planet)   -- add the planet to the list
   end
 
-  player = {}
-  player.w = 10
-  player.h = 20
-  player.x = planets[1].x -player.w/2   -- set player's position to be at top of the 1st planet
-  player.y = planets[1].y - planets[1].r - player.h
-  player.rot = -math.pi/2
-
-  player_collision = {}
-  player_collision.x = player.x   -- make a circle with an r = half the player's height to act as a collision detector
-  player_collision.y = player.y
-  player_collision.r = player.h/2
+  players = {}
+  for i = 1, num_players, 1 do    -- make players
+    local player = {}
+    player.w = 10
+    player.h = 20
+    player.x = planets[i].x -player.w/2   -- set player's position to be at top of the i planet
+    player.y = planets[i].y - planets[i].r - player.h
+    player.rot = -math.pi/2
+    player.red = math.random(200, 800)/1000
+    player.green = math.random(200, 800)/1000
+    player.blue = math.random(200, 800)/1000
+    table.insert(players, player)
+  end
 
   ball = {}
   ball.x = 0    -- set up the ball's values
@@ -79,29 +83,56 @@ function love.load()
 
   explosions = {}
   explosion_timer = 0
+
+  turn = 1
+
+  hit = false
 end
 
 function love.update(dt)
-  player_collision.x = player.x   -- make sure the player collision cirrcle is at the position of the player
-  player_collision.y = player.y
+  if turn > #players then
+    turn = 1
+  end
+  local player = players[turn]
+
+  for i = 1, #planets, 1 do
+    local craters = planets[i].craters
+    if #craters > 0 then
+      for j = 1, #craters, 1 do
+        local crater = craters[j]
+        for k = 1, #players, 1 do
+          local player = players[k]
+          if circleRectRotCollision(crater, player) then
+            explode(ball.x, ball.y, 7, 10, 100, 150, -100, 100, player.red, player.green, player.blue, 50)
+            table.remove(players, i)
+            ball.isThrown = false
+            score = 0
+            cooldown_timer = 0
+            turn = turn + 1
+            hit = true
+          end
+        end
+      end
+    end
+  end
 
   if player.rot > 2*math.pi then
     player.rot = 0
   end
-  temporary_radius = planets[1].r + player.h    -- makes a temporary radius equal to the radius of the planet + the height of the player
+  temporary_radius = planets[turn].r + player.h    -- makes a temporary radius equal to the radius of the planet + the height of the player
   if love.keyboard.isDown("a") then   -- rotate the player counter clockwise around the planet
-    if #planets[1].craters == 0 then    -- if there are no craters, just move
+    if #planets[turn].craters == 0 then    -- if there are no craters, just move
       player.rot = player.rot - 2*dt
     else
 
       move = true   -- start by saying you're able to move
 
-      for i = 1, #planets[1].craters, 1 do    -- go through each crater on the planet
-        local crater = planets[1].craters[i]
+      for i = 1, #planets[turn].craters, 1 do    -- go through each crater on the planet
+        local crater = planets[turn].craters[i]
 
         new_point = {}
-        new_point.x = (planets[1].r * math.cos(player.rot - 2*dt)) + planets[1].x   -- calculate your new coordinate (at left foot of player)
-        new_point.y = (planets[1].r * math.sin(player.rot - 2*dt)) + planets[1].y
+        new_point.x = (planets[turn].r * math.cos(player.rot - 2*dt)) + planets[turn].x   -- calculate your new coordinate (at left foot of player)
+        new_point.y = (planets[turn].r * math.sin(player.rot - 2*dt)) + planets[turn].y
 
         if distanceBetween(new_point, crater) < crater.r then   -- check if it's inside the crater
           move = false    -- if it is, set move to false
@@ -114,18 +145,18 @@ function love.update(dt)
     end
 
   elseif love.keyboard.isDown("d") then   -- rotate the player clockwise around the planet (same as going counter clockwise)
-    if #planets[1].craters == 0 then
+    if #planets[turn].craters == 0 then
       player.rot = player.rot + 2*dt
     else
 
       move = true
 
-      for i = 1, #planets[1].craters, 1 do
-        local crater = planets[1].craters[i]
+      for i = 1, #planets[turn].craters, 1 do
+        local crater = planets[turn].craters[i]
 
         new_point = {}
-        new_point.x = (planets[1].r * math.cos(player.rot + 2*dt + (4*math.pi/planets[1].r))) + planets[1].x    -- calculates right foot of player if moved
-        new_point.y = (planets[1].r * math.sin(player.rot + 2*dt + (4*math.pi/planets[1].r))) + planets[1].y
+        new_point.x = (planets[turn].r * math.cos(player.rot + 2*dt + (4*math.pi/planets[turn].r))) + planets[turn].x    -- calculates right foot of player if moved
+        new_point.y = (planets[turn].r * math.sin(player.rot + 2*dt + (4*math.pi/planets[turn].r))) + planets[turn].y
 
         if distanceBetween(new_point, crater) < crater.r then
           move = false
@@ -136,6 +167,7 @@ function love.update(dt)
         player.rot = player.rot + 2*dt
       end
     end
+  end
 
   -- if love.keyboard.isDown("w") then    -- this is for unlimited movement
   --   player.y = player.y - 2
@@ -145,64 +177,64 @@ function love.update(dt)
   --   player.y = player.y + 2
   -- elseif love.keyboard.isDown("d") then
   --   player.x = player.x + 2
-  elseif love.keyboard.isDown("r") then   -- reset the ball
-    ball.isThrown = false
-    score = 0
-  end
-  player.x = (temporary_radius * math.cos(player.rot)) + planets[1].x   -- move the player around the planet based on its rotation
-  player.y = (temporary_radius * math.sin(player.rot)) + planets[1].y
+
+  player.x = (temporary_radius * math.cos(player.rot)) + planets[turn].x   -- move the player around the planet based on its rotation
+  player.y = (temporary_radius * math.sin(player.rot)) + planets[turn].y
 
  if ball.isThrown then    -- run when the ball is thrown
+
+    for i = #players, 1, -1 do
+      local player = players[i]
+
+      temp_r = ball.r
+      ball.r = ball.r + 5
+      if circleRectRotCollision(ball, player) and cooldown_timer > 3 then
+        explode(ball.x, ball.y, 7, 10, 100, 150, -100, 100, player.red, player.green, player.blue, 50)
+        table.remove(players, i)
+        ball.isThrown = false
+        score = 0
+        cooldown_timer = 0
+        turn = turn + 1
+        hit = true
+      end
+      ball.r = temp_r
+    end
+
     for i = 1, #planets, 1 do
       local planet = planets[i]
 
-      ball.x = ball.x + (ball.dx * dt)    -- add the ball's velocity to the position
-      ball.y = ball.y + (ball.dy * dt)
+      if true then    -- acceleration stuff
+        ball.x = ball.x + (ball.dx * dt)    -- add the ball's velocity to the position
+        ball.y = ball.y + (ball.dy * dt)
 
-      mass_multiplier = 1000    -- affects gravitational influence
-      G = 10    -- gravitational constant
+        mass_multiplier = 1000    -- affects gravitational influence
+        G = 10    -- gravitational constant
 
-      vx = ball.x - planet.x    -- get the vector from the ball to the planet
-      vy = ball.y - planet.y
-      dist = distanceBetween(ball, planet)    -- get the distance
-      force = -(G * (planet.r * mass_multiplier) * (ball.r * mass_multiplier))/dist^2   -- find the force based on the distance and masses
-      acceleration1 = force/(planet.r * mass_multiplier)    -- planet's acceleration (not used)
-      acceleration2 = force/(ball.r * mass_multiplier)    -- ball's acceleration (not used)
+        vx = ball.x - planet.x    -- get the vector from the ball to the planet
+        vy = ball.y - planet.y
+        dist = distanceBetween(ball, planet)    -- get the distance
+        force = -(G * (planet.r * mass_multiplier) * (ball.r * mass_multiplier))/dist^2   -- find the force based on the distance and masses
+        acceleration1 = force/(planet.r * mass_multiplier)    -- planet's acceleration (not used)
+        acceleration2 = force/(ball.r * mass_multiplier)    -- ball's acceleration (not used)
 
-      nx, ny = 0, 0   -- normalize?
-      if dist > 0 then
-        nx, ny = vx/dist, vy/dist
+        nx, ny = 0, 0   -- normalize?
+        if dist > 0 then
+          nx, ny = vx/dist, vy/dist
+        end
+
+        acceleration2x = nx*acceleration2   -- get the normalized accelerations
+        acceleration2y = ny*acceleration2
+
+        ball.dy = ball.dy + acceleration2y*dt   -- add the ball's acceleration to it's velocity
+        ball.dx = ball.dx + acceleration2x*dt
       end
-
-      acceleration2x = nx*acceleration2   -- get the normalized accelerations
-      acceleration2y = ny*acceleration2
-
-      ball.dy = ball.dy + acceleration2y*dt   -- add the ball's acceleration to it's velocity
-      ball.dx = ball.dx + acceleration2x*dt
 
       if distanceBetween(ball, planet) < planet.r + ball.r then   -- reset if the ball has hit the planet
         ball.isThrown = false
         cooldown_timer = 0
         explosion_timer = 0
         score = 0
-
-        for i = #particles, 1, -1 do    -- remove particle trail
-          table.remove(particles, i)
-        end
-
-        num_particles = math.random(10, 15)   -- make 10 - 15 explosion clouds with random values
-        for i = 1, num_particles, 1 do
-          local explosion = {}
-          explosion.x = ball.x
-          explosion.y = ball.y
-          explosion.r = math.random(10, 15)
-          explosion.red = math.random(950, 1000)/1000   -- color should be close to red
-          explosion.green = math.random(250, 350)/1000
-          explosion.blue = math.random(250, 350)/1000
-          explosion.dx = math.random(-100, 100)/100
-          explosion.dy = math.random(-100, 100)/100
-          table.insert(explosions, explosion)
-        end
+        turn = turn + 1
 
         local crater = {}
         crater.r = math.random(10, 15)    -- set up a circle for the crater
@@ -210,20 +242,33 @@ function love.update(dt)
         crater.y = ball.y
         table.insert(planet.craters, crater)    -- add the crater to the planet's list
 
+        for j = #particles, 1, -1 do    -- remove particle trail
+          table.remove(particles, j)
+        end
+
+        explode(ball.x, ball.y, 7, 10, 10, 15, -100, 100, 950, 400, 400, 50)
+
+        for j = #players, 1, -1 do
+          local player = players[j]
+          temp_r = crater.r
+          crater.r = 20
+          if circleRectRotCollision(crater, player) and cooldown_timer > 5 then    -- see if ball has hit player
+            explode(ball.x, ball.y, 7, 10, 10, 15, -100, 100, 400, 850, 400, 50)
+            table.remove(players, j)
+            ball.isThrown = false
+            score = 0
+            cooldown_timer = 0
+            turn = turn + 1
+            hit = true
+          end
+          crater.r = temp_r
+        end
+
         local plant = {}
         plant.x = ball.x
         plant.y = ball.y
         plant.w = 2
         plant.h = 5
-      end
-    end
-
-    if distanceBetween(ball, player_collision) < player_collision.r + ball.r and cooldown_timer > 1 then    -- see if player has caught ball
-      ball.isThrown = false
-      cooldown_timer = 0
-
-      for i = #particles, 1, -1 do    -- clear the particle trail
-        table.remove(particles, i)
       end
     end
 
@@ -235,7 +280,7 @@ function love.update(dt)
       tempscore = tempscore + 1
     end
 
-    if tempscore%5 == 0 then    -- add a particle at the current position of the ball every fifth 1/60 of a second
+    if tempscore % 5 == 0 then    -- add a particle at the current position of the ball every fifth 1/60 of a second
       local particle = {}
       particle.x = ball.x
       particle.y = ball.y
@@ -244,9 +289,15 @@ function love.update(dt)
       particle.dy = math.random(-0.5, 0.5)
       table.insert(particles, particle)     -- add a particle at the ball's position with some random values
     end
+
+    if score == 5 then    -- remove ball is it's been 5 seconds
+      ball.isThrown = false
+      score = 0
+      turn = turn + 1
+    end
   end
 
-  for i = #particles, 1, -1 do    -- the particle trail
+  for i = #particles, 1, -1 do    -- update the particle trail
     local p = particles[i]
     p.x = p.x + (p.dx * dt)*60   -- move the particle
     p.y = p.y + (p.dy * dt)*60
@@ -261,7 +312,7 @@ function love.update(dt)
     end
   end
 
-  explosion_timer = explosion_timer + 1
+  explosion_timer = explosion_timer + 1   -- go from 0 to 50 for the epxlosions' radius
   if explosion_timer > 50 then
     explosion_timer = 0
   end
@@ -284,6 +335,12 @@ end
 
 function love.draw()
   g.setBackgroundColor((1 - random_color.r)/2, (1 - random_color.g)/2, (1 - random_color.b)/2)    -- draw the opposite color of the planets as the background
+
+  if hit then
+    g.setColor(0, 0, 0)
+    g.rectangle("fill", 0, 0, width, height)
+    -- hit = false
+  end
 
   -- g.setColor(random_color.r, random_color.b, random_color.g)
   -- g.setFont(myFont)
@@ -309,12 +366,15 @@ function love.draw()
     g.circle("fill", e.x, e.y, e.r)   -- draw the particles
   end
 
-  g.setColor(1, 0.3, 0.3)
-  g.translate(player.x, player.y)
-  g.rotate(player.rot + math.pi/2)    -- rotate the player so it's perpendicular to the surface of the planet
-  g.translate(-player.x, -player.y)
-  g.rectangle("fill", player.x, player.y, player.w, player.h)   -- draw the player
-  g.origin()
+  for i = 1, #players, 1 do
+    local player = players[i]
+    g.setColor(player.red, player.green, player.blue)
+    g.translate(player.x, player.y)
+    g.rotate(player.rot + math.pi/2)    -- rotate the player so it's perpendicular to the surface of the planet
+    g.translate(-player.x, -player.y)
+    g.rectangle("fill", player.x, player.y, player.w, player.h)   -- draw the player
+    g.origin()
+  end
 
   if ball.isThrown then
     g.setColor(0.5, 0.9, 0.7)
@@ -338,8 +398,8 @@ function love.mousepressed(x, y, button)
 	if button == 1 then
     if ball.isThrown == false then    -- throw ball is mouse is pressed
       ball.isThrown = true
-      ball.x = player.x
-      ball.y = player.y
+      ball.x = players[turn].x
+      ball.y = players[turn].y
       ball.dx = (love.mouse.getX() - ball.x) * throwing_multiplier    -- add velocity to the ball in the direction of the mouse
       ball.dy = (love.mouse.getY() - ball.y) * throwing_multiplier
     end
@@ -356,6 +416,149 @@ end
 
 function distanceBetween(a, b)
   return math.sqrt((a.y - b.y)^2 + (a.x - b.x)^2)   -- distance formula
+end
+
+function circleRectCollision(circle, rect)
+  resolution = 2
+
+  for i = 0, rect.w, resolution do
+    local point = {}
+    point.x = rect.x + (i * math.cos(rect.rot - math.pi/2))
+    point.y = rect.y + (i * math.sin(rect.rot - math.pi/2))
+
+    if distanceBetween(point, circle) < circle.r then
+      return true
+    end
+
+    opposite_point = {}
+    opposite_point.x = point.x + (rect.h * math.cos(rect.rot + 2*math.pi))
+    opposite_point.y = point.y + (rect.h * math.sin(rect.rot + 2*math.pi))
+
+    if distanceBetween(point, circle) < circle.r then
+      return true
+    end
+  end
+
+  for i = 0, rect.h, resolution do
+    local point = {}
+    point.x = rect.x + (i * math.cos(rect.rot + 2*math.pi))
+    point.y = rect.y + (i * math.sin(rect.rot + 2*math.pi))
+
+    if distanceBetween(point, circle) < circle.r then
+      return true
+    end
+
+    opposite_point = {}
+    opposite_point.x = point.x + (rect.h * math.cos(rect.rot - math.pi/2))
+    opposite_point.y = point.y + (rect.h * math.sin(rect.rot - math.pi/2))
+
+    if distanceBetween(point, circle) < circle.r then
+      return true
+    end
+  end
+
+  return false
+end
+
+function circleRectRotCollision(circle, rect)
+  resolution = 2
+  local rect_points = {}
+
+  for i = 0, rect.w*2, resolution do
+    local point = {}
+    point.x = rect.x + (i * math.cos(rect.rot + math.pi/2))
+    point.y = rect.y + (i * math.sin(rect.rot + math.pi/2))
+
+    table.insert(rect_points, point.x)
+    table.insert(rect_points, point.y)
+
+    opposite_point = {}
+    opposite_point.x = point.x + (rect.h/2 * math.cos(rect.rot + 2*math.pi))
+    opposite_point.y = point.y + (rect.h/2 * math.sin(rect.rot + 2*math.pi))
+
+    table.insert(rect_points, opposite_point.x)
+    table.insert(rect_points, opposite_point.y)
+  end
+
+  for i = 0, rect.h/2, resolution do
+    local point = {}
+    point.x = rect.x + (i * math.cos(rect.rot - 2*math.pi))
+    point.y = rect.y + (i * math.sin(rect.rot - 2*math.pi))
+
+    table.insert(rect_points, point.x)
+    table.insert(rect_points, point.y)
+
+    opposite_point = {}
+    opposite_point.x = point.x + (rect.h * math.cos(rect.rot + math.pi/2))
+    opposite_point.y = point.y + (rect.h * math.sin(rect.rot + math.pi/2))
+
+    table.insert(rect_points, opposite_point.x)
+    table.insert(rect_points, opposite_point.y)
+  end
+
+  for i = 1, #rect_points, 2 do
+    local point = {}
+    point.x = rect_points[i]
+    point.y = rect_points[i+1]
+    if distanceBetween(point, circle) < circle.r then
+      return true
+    end
+  end
+  return false
+end
+
+function drawCollisionPoints(points_table, circle, rect)
+  resolution = 2
+
+  for i = 0, rect.w*2, resolution do
+    local point = {}
+    point.x = rect.x + (i * math.cos(rect.rot + math.pi/2))
+    point.y = rect.y + (i * math.sin(rect.rot + math.pi/2))
+
+    table.insert(points_table, point.x)
+    table.insert(points_table, point.y)
+
+    opposite_point = {}
+    opposite_point.x = point.x + (rect.h/2 * math.cos(rect.rot + 2*math.pi))
+    opposite_point.y = point.y + (rect.h/2 * math.sin(rect.rot + 2*math.pi))
+
+    table.insert(points_table, opposite_point.x)
+    table.insert(points_table, opposite_point.y)
+  end
+
+  for i = 0, rect.h/2, resolution do
+    local point = {}
+    point.x = rect.x + (i * math.cos(rect.rot - 2*math.pi))
+    point.y = rect.y + (i * math.sin(rect.rot - 2*math.pi))
+
+    table.insert(points_table, point.x)
+    table.insert(points_table, point.y)
+
+    opposite_point = {}
+    opposite_point.x = point.x + (rect.h * math.cos(rect.rot + math.pi/2))
+    opposite_point.y = point.y + (rect.h * math.sin(rect.rot + math.pi/2))
+
+    table.insert(points_table, opposite_point.x)
+    table.insert(points_table, opposite_point.y)
+  end
+
+  return points_table
+end
+
+function explode(x, y, min_particles, max_particles, min_size, max_size, min_vel, max_vel, red, green, blue, color_range)
+  num_particles = math.random(min_particles, max_particles)   -- make 10 - 15 explosion clouds with random values
+  for i = 1, num_particles, 1 do
+    local explosion = {}
+    explosion.x = x
+    explosion.y = y
+    explosion.r = math.random(min_size, max_size)
+    explosion.red = math.random(red - color_range, red + color_range)/1000   -- color should be close to red
+    explosion.green = math.random(green - color_range, green + color_range)/1000
+    explosion.blue = math.random(blue - color_range, blue + color_range)/1000
+    explosion.dx = math.random(min_vel, max_vel)/100
+    explosion.dy = math.random(min_vel, max_vel)/100
+    table.insert(explosions, explosion)
+  end
 end
 
 function angleBetween(a, b)   -- find the angle between two shapes
