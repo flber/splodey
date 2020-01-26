@@ -4,11 +4,21 @@ function love.load()
   width = g.getWidth()    -- get the width and height for future use
   height = g.getHeight()
 
-  myFont = g.newFont(40)    -- making a larger font for the score
+  scoreFontScale = 40
+  titleFontScale = width/5.3
+  buttonFontScale = width/10.6
+  largeFontScale = height/1.26
+
+  textBuffer = 20
+
+  scoreFont = g.newFont(scoreFontScale)    -- making a larger font for the score
+  titleFont = g.newFont(titleFontScale)
+  buttonFont = g.newFont(buttonFontScale)
+  largeFont = g.newFont(largeFontScale)
 
   throwing_multiplier = 0.2   -- this will affect the speed of the projectile
 
-  num_players = 6
+  num_players = 2
 
   math.randomseed(os.time())    -- seeding random number generation
   random_color = {}
@@ -31,40 +41,14 @@ function love.load()
       zone.width = zone_width
       zone.height = zone_height
       table.insert(zones, zone)   -- add the new zone to the list of zones
-    end
+    end   -- make zones
   end
+
+  table.remove(zones, 1)
 
   planets = {}
-  num_planets = math.floor(math.random(num_players + 2, num_players + 4))   -- generate 2 to 4 more planets than players
-
-  avaiable_zones = zones
-  for i = 1, num_planets, 1 do    -- make planets
-    num = math.random(1, #avaiable_zones)   -- pick a random zone and then take it out of the pool
-    picked_zone = avaiable_zones[num]
-    table.remove(avaiable_zones, num)
-
-    local planet = {}
-    planet.r = math.random(30, 70)    -- make a new planet and place it within that random zone
-    planet.x = math.random(picked_zone.x + planet.r, (picked_zone.x + picked_zone.width) - planet.r)
-    planet.y = math.random(picked_zone.y + planet.r, (picked_zone.y + picked_zone.height) - planet.r)
-    planet.craters = {}
-    table.insert(planets, planet)   -- add the planet to the list
-  end
 
   players = {}
-  for i = 1, num_players, 1 do    -- make players
-    local player = {}
-    player.w = 10
-    player.h = 20
-    player.x = planets[i].x -player.w/2   -- set player's position to be at top of the i planet
-    player.y = planets[i].y - planets[i].r - player.h
-    player.rot = -math.pi/2
-    player.red = math.random(200, 800)/1000
-    player.green = math.random(200, 800)/1000
-    player.blue = math.random(200, 800)/1000
-    player.planet = i
-    table.insert(players, player)
-  end
 
   ball = {}
   ball.x = 0    -- set up the ball's values
@@ -88,347 +72,552 @@ function love.load()
   turn = 1
 
   hit = false
+
+  previousScene = "start"
+  scene = "start"
+
+  titlePlanet = {}
+  titlePlanet.x = width/1.42
+  titlePlanet.y = height/1.5
+  titlePlanet.r = 100
+
+  titleBall = {}
+  titleBall.x = titlePlanet.x
+  titleBall.y = titlePlanet.y - 150
+  titleBall.r = 10
+  titleBall.dx = -80
+  titleBall.dy = 0
+
+  buttonCooldown = 0
+
+  hasGenerated = false
+
+  showTip = false
+  tips = {"Hit players at their feet to kill them",
+          "Use 'a' and 'd' to move around your planet!",
+          "Remember: you can't go over craters!",
+          "You can trap other players by hitting either side of them"}
+  tipTimer = 0
 end
 
 function love.update(dt)
-  if turn > #players then
-    turn = 1
-  end
-  if #players == 0 then
-    love.event.quit("restart")
-  end
-  local player = players[turn]
+  buttonCooldown = buttonCooldown + 1
 
-  for i = 1, #planets, 1 do
-    local craters = planets[i].craters
-    if #craters > 0 then
-      for j = 1, #craters, 1 do
-        local crater = craters[j]
-        for k = 1, #players, 1 do
-          local player = players[k]
-          if player ~= nil and circleRectRotCollision(crater, player) then
-            explode(ball.x, ball.y, 7, 10, 100, 150, -100, 100, player.red, player.green, player.blue, 50)
-            table.remove(players, i)
-            ball.isThrown = false
-            score = 0
-            cooldown_timer = 0
-            turn = turn + 1
-            hit = true
-          end
-        end
-      end
-    end
-  end
+  if scene == "start" then
 
-  if turn > #players then
-    turn = 1
-  end
-  if #players == 0 then
-    love.event.quit("restart")
-  end
+    if true then    -- acceleration stuff
+      titleBall.x = titleBall.x + (titleBall.dx * dt)    -- add the titleBall's velocity to the position
+      titleBall.y = titleBall.y + (titleBall.dy * dt)
 
-  for i = 1, #players, 1 do
-    local player = players[i]
-    if player.rot > 2*math.pi then
-      player.rot = 0
-    end
-  end
-  temporary_radius = planets[player.planet].r + player.h    -- makes a temporary radius equal to the radius of the planet + the height of the player
-  if love.keyboard.isDown("a") then   -- rotate the player counter clockwise around the planet
-    if #planets[player.planet].craters == 0 then    -- if there are no craters, just move
-      player.rot = player.rot - 2*dt
-    else
+      mass_multiplier = 1000    -- affects gravitational influence
+      G = 10    -- gravitational constant
 
-      move = true   -- start by saying you're able to move
+      vx = titleBall.x - titlePlanet.x    -- get the vector from the titleBall to the titlePlanet
+      vy = titleBall.y - titlePlanet.y
+      dist = distanceBetween(titleBall, titlePlanet)    -- get the distance
+      force = -(G * (titlePlanet.r * mass_multiplier) * (titleBall.r * mass_multiplier))/dist^2   -- find the force based on the distance and masses
+      acceleration1 = force/(titlePlanet.r * mass_multiplier)    -- titlePlanet's acceleration (not used)
+      acceleration2 = force/(titleBall.r * mass_multiplier)    -- titleBall's acceleration (not used)
 
-      for i = 1, #planets[player.planet].craters, 1 do    -- go through each crater on the planet
-        local crater = planets[player.planet].craters[i]
-
-        new_point = {}
-        new_point.x = (planets[player.planet].r * math.cos(player.rot - 2*dt)) + planets[player.planet].x   -- calculate your new coordinate (at left foot of player)
-        new_point.y = (planets[player.planet].r * math.sin(player.rot - 2*dt)) + planets[player.planet].y
-
-        if distanceBetween(new_point, crater) < crater.r then   -- check if it's inside the crater
-          move = false    -- if it is, set move to false
-        end
+      nx, ny = 0, 0   -- normalize?
+      if dist > 0 then
+        nx, ny = vx/dist, vy/dist
       end
 
-      if move then    -- if you can still move, move
-        player.rot = player.rot - 2*dt
-      end
+      acceleration2x = nx*acceleration2   -- get the normalized accelerations
+      acceleration2y = ny*acceleration2
+
+      titleBall.dy = titleBall.dy + acceleration2y*dt   -- add the titleBall's acceleration to it's velocity
+      titleBall.dx = titleBall.dx + acceleration2x*dt
     end
 
-  elseif love.keyboard.isDown("d") then   -- rotate the player clockwise around the planet (same as going counter clockwise)
-    if #planets[player.planet].craters == 0 then
-      player.rot = player.rot + 2*dt
-    else
+    mouseX = love.mouse.getX()
+    mouseY = love.mouse.getY()
 
-      move = true
+    startX = width/80
+    startY = textBuffer + titleFontScale + textBuffer
+    startW = width/5
+    startH = buttonFontScale
 
-      for i = 1, #planets[player.planet].craters, 1 do
-        local crater = planets[player.planet].craters[i]
+    quitX = width/80
+    quitY = textBuffer + titleFontScale + textBuffer + buttonFontScale + textBuffer
+    quitW = width/4.84
+    quitH = buttonFontScale
 
-        new_point = {}
-        new_point.x = (planets[player.planet].r * math.cos(player.rot + 2*dt + (4*math.pi/planets[player.planet].r))) + planets[player.planet].x    -- calculates right foot of player if moved
-        new_point.y = (planets[player.planet].r * math.sin(player.rot + 2*dt + (4*math.pi/planets[player.planet].r))) + planets[player.planet].y
-
-        if distanceBetween(new_point, crater) < crater.r then
-          move = false
-        end
-      end
-
-      if move then
-        player.rot = player.rot + 2*dt
-      end
+    if love.mouse.isDown(1) and mouseX > startX and mouseX < startX + startW and mouseY > startY and mouseY < startY + startH then
+      if buttonCooldown > 5 then toScene("setup") end
+    elseif love.mouse.isDown(1) and mouseX > quitX and mouseX < quitX + quitW and mouseY > quitY and mouseY < quitY + quitH then
+      if buttonCooldown > 5 then love.event.quit(0) end
     end
-  end
 
-  -- if love.keyboard.isDown("w") then    -- this is for unlimited movement
-  --   player.y = player.y - 2
-  -- elseif love.keyboard.isDown("a") then
-  --   player.x = player.x - 2
-  -- elseif love.keyboard.isDown("s") then
-  --   player.y = player.y + 2
-  -- elseif love.keyboard.isDown("d") then
-  --   player.x = player.x + 2
+  elseif scene == "setup" then
+    mouseX = love.mouse.getX()
+    mouseY = love.mouse.getY()
 
-  player.x = (temporary_radius * math.cos(player.rot)) + planets[player.planet].x   -- move the player around the planet based on its rotation
-  player.y = (temporary_radius * math.sin(player.rot)) + planets[player.planet].y
+    plusX = textBuffer + largeFontScale/1.5 + textBuffer
+    plusY = textBuffer + buttonFontScale + textBuffer + largeFontScale/2 - textBuffer/2 - buttonFontScale
+    plusW = buttonFontScale
+    plusH = buttonFontScale
 
- if ball.isThrown then    -- run when the ball is thrown
+    minusX = textBuffer + largeFontScale/1.5 + textBuffer
+    minusY = textBuffer + buttonFontScale + textBuffer + largeFontScale/2 + textBuffer/2
+    minusW = titleFontScale
+    minusH = titleFontScale
 
-    for i = #players, 1, -1 do
-      local player = players[i]
+    goX = textBuffer + largeFontScale/1.5 + textBuffer + titleFontScale/1.5 + textBuffer
+    goY = textBuffer + buttonFontScale + textBuffer + largeFontScale/2 - titleFontScale/2.5
+    goW = width/3.08
+    goH = height/5.22
 
-      temp_r = ball.r
-      ball.r = ball.r + 5
-      if circleRectRotCollision(ball, player) and cooldown_timer > 3 then
-        explode(ball.x, ball.y, 7, 10, 100, 150, -100, 100, player.red, player.green, player.blue, 50)
-        table.remove(players, i)
-        ball.isThrown = false
-        score = 0
-        cooldown_timer = 0
-        turn = turn + 1
-        hit = true
-
-        if turn > #players then
-          turn = 1
-        end
-        if #players == 0 then
-          love.event.quit("restart")
-        end
-      end
-      ball.r = temp_r
+    if love.mouse.isDown(1) and mouseX > plusX and mouseX < plusX + plusW and mouseY > plusY and mouseY < plusY + plusH then
+      if buttonCooldown > 5 and num_players < 9 then num_players = num_players + 1 end
+      buttonCooldown = 0
+    elseif love.mouse.isDown(1) and mouseX > minusX and mouseX < minusX + minusW and mouseY > minusY and mouseY < minusY + minusH then
+      if buttonCooldown > 5 and num_players > 2 then num_players = num_players - 1 end
+      buttonCooldown = 0
+    elseif love.mouse.isDown(1) and mouseX > goX and mouseX < goX + goW and mouseY > goY and mouseY < goY + goH then
+      if buttonCooldown > 5 then toScene("loading") end
     end
+  elseif scene == "loading" then
+    tipTimer = tipTimer + dt
+    if tipTimer > 3 then
+      hasGenerated = false
+      toScene("game")
+      tipTimer = 0
+    end
+  elseif scene == "game" then
+    if hasGenerated == false then
+      generate()
+      hasGenerated = true
+    end
+
+    if turn > #players then
+      turn = 1
+    end
+    if #players < 2 then
+      players[turn].score = players[turn].score + 1
+      hasGenerated = false
+      toScene("win")
+    end
+
+    local player = players[turn]
 
     for i = 1, #planets, 1 do
-      local planet = planets[i]
-
-      if true then    -- acceleration stuff
-        ball.x = ball.x + (ball.dx * dt)    -- add the ball's velocity to the position
-        ball.y = ball.y + (ball.dy * dt)
-
-        mass_multiplier = 1000    -- affects gravitational influence
-        G = 10    -- gravitational constant
-
-        vx = ball.x - planet.x    -- get the vector from the ball to the planet
-        vy = ball.y - planet.y
-        dist = distanceBetween(ball, planet)    -- get the distance
-        force = -(G * (planet.r * mass_multiplier) * (ball.r * mass_multiplier))/dist^2   -- find the force based on the distance and masses
-        acceleration1 = force/(planet.r * mass_multiplier)    -- planet's acceleration (not used)
-        acceleration2 = force/(ball.r * mass_multiplier)    -- ball's acceleration (not used)
-
-        nx, ny = 0, 0   -- normalize?
-        if dist > 0 then
-          nx, ny = vx/dist, vy/dist
-        end
-
-        acceleration2x = nx*acceleration2   -- get the normalized accelerations
-        acceleration2y = ny*acceleration2
-
-        ball.dy = ball.dy + acceleration2y*dt   -- add the ball's acceleration to it's velocity
-        ball.dx = ball.dx + acceleration2x*dt
-      end
-
-      if distanceBetween(ball, planet) < planet.r + ball.r then   -- reset if the ball has hit the planet
-        ball.isThrown = false
-        cooldown_timer = 0
-        explosion_timer = 0
-        score = 0
-        turn = turn + 1
-
-        local crater = {}
-        crater.r = math.random(10, 15)    -- set up a circle for the crater
-        crater.x = ball.x
-        crater.y = ball.y
-        table.insert(planet.craters, crater)    -- add the crater to the planet's list
-
-        for j = #particles, 1, -1 do    -- remove particle trail
-          table.remove(particles, j)
-        end
-
-        explode(ball.x, ball.y, 7, 10, 10, 15, -100, 100, 950, 400, 400, 50)
-
-        for j = #players, 1, -1 do
-          local player = players[j]
-          temp_r = crater.r
-          crater.r = 20
-          if circleRectRotCollision(crater, player) and cooldown_timer > 5 then    -- see if ball has hit player
-            explode(ball.x, ball.y, 7, 10, 10, 15, -100, 100, 400, 850, 400, 50)
-            table.remove(players, j)
-            ball.isThrown = false
-            score = 0
-            cooldown_timer = 0
-            turn = turn + 1
-            hit = true
-
-            if turn > #players then
-              turn = 1
-            end
-            if #players == 0 then
-              love.event.quit("restart")
+      local craters = planets[i].craters
+      if #craters > 0 then
+        for j = 1, #craters, 1 do
+          local crater = craters[j]
+          for k = 1, #players, 1 do
+            local player = players[k]
+            if player ~= nil and circleRectRotCollision(crater, player) then
+              explode(ball.x, ball.y, 7, 10, 100, 150, -100, 100, player.red, player.green, player.blue, 50)
+              table.remove(players, i)
+              ball.isThrown = false
+              score = 0
+              cooldown_timer = 0
+              turn = turn + 1
+              hit = true
             end
           end
-          crater.r = temp_r
+        end
+      end   -- detect player collisions with crater and kill player
+    end
+
+    if turn > #players then
+      turn = 1
+    end
+    if #players < 2 then
+      players[turn].score = players[turn].score + 1
+      hasGenerated = false
+      toScene("win")
+    end
+
+    for i = 1, #players, 1 do   -- reset rot to 0 if gone all the way around
+      local player = players[i]
+      if player.rot > 2*math.pi then
+        player.rot = 0
+      end
+    end
+    temporary_radius = planets[player.planet].r + player.h    -- makes a temporary radius equal to the radius of the planet + the height of the player
+    if love.keyboard.isDown("a") then   -- rotate the player counter clockwise around the planet
+      if #planets[player.planet].craters == 0 then    -- if there are no craters, just move
+        player.rot = player.rot - 2*dt
+      else
+
+        move = true   -- start by saying you're able to move
+
+        for i = 1, #planets[player.planet].craters, 1 do    -- go through each crater on the planet
+          local crater = planets[player.planet].craters[i]
+
+          new_point = {}
+          new_point.x = (planets[player.planet].r * math.cos(player.rot - 2*dt)) + planets[player.planet].x   -- calculate your new coordinate (at left foot of player)
+          new_point.y = (planets[player.planet].r * math.sin(player.rot - 2*dt)) + planets[player.planet].y
+
+          if distanceBetween(new_point, crater) < crater.r then   -- check if it's inside the crater
+            move = false    -- if it is, set move to false
+          end
         end
 
-        local plant = {}
-        plant.x = ball.x
-        plant.y = ball.y
-        plant.w = 2
-        plant.h = 5
+        if move then    -- if you can still move, move
+          player.rot = player.rot - 2*dt
+        end
+      end
+
+    elseif love.keyboard.isDown("d") then   -- rotate the player clockwise around the planet (same as going counter clockwise)
+      if #planets[player.planet].craters == 0 then
+        player.rot = player.rot + 2*dt
+      else
+
+        move = true
+
+        for i = 1, #planets[player.planet].craters, 1 do
+          local crater = planets[player.planet].craters[i]
+
+          new_point = {}
+          new_point.x = (planets[player.planet].r * math.cos(player.rot + 2*dt + (4*math.pi/planets[player.planet].r))) + planets[player.planet].x    -- calculates right foot of player if moved
+          new_point.y = (planets[player.planet].r * math.sin(player.rot + 2*dt + (4*math.pi/planets[player.planet].r))) + planets[player.planet].y
+
+          if distanceBetween(new_point, crater) < crater.r then
+            move = false
+          end
+        end
+
+        if move then
+          player.rot = player.rot + 2*dt
+        end
       end
     end
 
-    if tempscore == 60 then   -- increase the score by 1 each second
-      score = score + 1
-      cooldown_timer = cooldown_timer + 1
-      tempscore = 0
-    else
-      tempscore = tempscore + 1
+    -- if love.keyboard.isDown("w") then    -- this is for unlimited movement
+    --   player.y = player.y - 2
+    -- elseif love.keyboard.isDown("a") then
+    --   player.x = player.x - 2
+    -- elseif love.keyboard.isDown("s") then
+    --   player.y = player.y + 2
+    -- elseif love.keyboard.isDown("d") then
+    --   player.x = player.x + 2
+
+    player.x = (temporary_radius * math.cos(player.rot)) + planets[player.planet].x   -- move the player around the planet based on its rotation
+    player.y = (temporary_radius * math.sin(player.rot)) + planets[player.planet].y
+
+   if ball.isThrown then    -- run when the ball is thrown
+
+      for i = 1, #planets, 1 do
+        local planet = planets[i]
+
+        if true then    -- acceleration stuff
+          ball.x = ball.x + (ball.dx * dt)    -- add the ball's velocity to the position
+          ball.y = ball.y + (ball.dy * dt)
+
+          mass_multiplier = 1000    -- affects gravitational influence
+          G = 10    -- gravitational constant
+
+          vx = ball.x - planet.x    -- get the vector from the ball to the planet
+          vy = ball.y - planet.y
+          dist = distanceBetween(ball, planet)    -- get the distance
+          force = -(G * (planet.r * mass_multiplier) * (ball.r * mass_multiplier))/dist^2   -- find the force based on the distance and masses
+          acceleration1 = force/(planet.r * mass_multiplier)    -- planet's acceleration (not used)
+          acceleration2 = force/(ball.r * mass_multiplier)    -- ball's acceleration (not used)
+
+          nx, ny = 0, 0   -- normalize?
+          if dist > 0 then
+            nx, ny = vx/dist, vy/dist
+          end
+
+          acceleration2x = nx*acceleration2   -- get the normalized accelerations
+          acceleration2y = ny*acceleration2
+
+          ball.dy = ball.dy + acceleration2y*dt   -- add the ball's acceleration to it's velocity
+          ball.dx = ball.dx + acceleration2x*dt
+        end
+
+        if distanceBetween(ball, planet) < planet.r + ball.r then   -- reset if the ball has hit the planet
+          ball.isThrown = false
+          cooldown_timer = 0
+          explosion_timer = 0
+          score = 0
+          turn = turn + 1
+
+          local crater = {}
+          crater.r = math.random(10, 15)    -- set up a circle for the crater
+          crater.x = ball.x
+          crater.y = ball.y
+          table.insert(planet.craters, crater)    -- add the crater to the planet's list
+
+          for j = #particles, 1, -1 do    -- remove particle trail
+            table.remove(particles, j)
+          end
+
+          explode(ball.x, ball.y, 7, 10, 10, 15, -100, 100, 950, 400, 400, 50)
+
+          local plant = {}
+          plant.x = ball.x
+          plant.y = ball.y
+          plant.w = 2
+          plant.h = 5
+        end
+      end
+
+      if tempscore == 60 then   -- increase the score by 1 each second
+        score = score + 1
+        cooldown_timer = cooldown_timer + 1
+        tempscore = 0
+      else
+        tempscore = tempscore + 1
+      end
+
+      if tempscore % 5 == 0 then    -- add a particle at the current position of the ball every fifth 1/60 of a second
+        local particle = {}
+        particle.x = ball.x
+        particle.y = ball.y
+        particle.r = math.random(3, 5)
+        particle.dx = math.random(-0.5, 0.5)
+        particle.dy = math.random(-0.5, 0.5)
+        table.insert(particles, particle)     -- add a particle at the ball's position with some random values
+      end
+
+      if score == 5 then    -- remove ball is it's been 5 seconds
+        ball.isThrown = false
+        score = 0
+        turn = turn + 1
+        cooldown_timer = 0
+      end
     end
 
-    if tempscore % 5 == 0 then    -- add a particle at the current position of the ball every fifth 1/60 of a second
-      local particle = {}
-      particle.x = ball.x
-      particle.y = ball.y
-      particle.r = math.random(3, 5)
-      particle.dx = math.random(-0.5, 0.5)
-      particle.dy = math.random(-0.5, 0.5)
-      table.insert(particles, particle)     -- add a particle at the ball's position with some random values
+    for i = #particles, 1, -1 do    -- update the particle trail
+      local p = particles[i]
+      p.x = p.x + (p.dx * dt)*60   -- move the particle
+      p.y = p.y + (p.dy * dt)*60
+
+      p.dx = p.dx / 1.1   -- slow down the particle
+      p.dy = p.dy / 1.1
+
+      p.r = p.r - 0.1     -- reduce the particle's size
+
+      if p.r < 0 then
+        table.remove(particles, i)    -- when a particle gets too small, just delete it
+      end
     end
 
-    if score == 5 then    -- remove ball is it's been 5 seconds
-      ball.isThrown = false
-      score = 0
-      turn = turn + 1
+    explosion_timer = explosion_timer + 1   -- go from 0 to 50 for the epxlosions' radius
+    if explosion_timer > 50 then
+      explosion_timer = 0
     end
-  end
 
-  for i = #particles, 1, -1 do    -- update the particle trail
-    local p = particles[i]
-    p.x = p.x + (p.dx * dt)*60   -- move the particle
-    p.y = p.y + (p.dy * dt)*60
+    for i = #explosions, 1, -1 do   -- makes the explosion animation
+      local e = explosions[i]
+      e.x = e.x + (e.dx * dt)*60    -- move the particle
+      e.y = e.y + (e.dy * dt)*60
 
-    p.dx = p.dx / 1.1   -- slow down the particle
-    p.dy = p.dy / 1.1
+      e.dx = e.dx / 1.01   -- slow down the particle
+      e.dy = e.dy / 1.01
 
-    p.r = p.r - 0.1     -- reduce the particle's size
+      e.r = 2 * (5*(math.sqrt(explosion_timer)-((1/7)*explosion_timer - 10))-50)     -- reduce the particle's size
 
-    if p.r < 0 then
-      table.remove(particles, i)    -- when a particle gets too small, just delete it
+      if e.r < 0 then
+        table.remove(explosions, i)    -- when a particle gets too small, just delete it
+      end
     end
-  end
+  elseif scene == "pause" then
+    mouseX = love.mouse.getX()
+    mouseY = love.mouse.getY()
 
-  explosion_timer = explosion_timer + 1   -- go from 0 to 50 for the epxlosions' radius
-  if explosion_timer > 50 then
-    explosion_timer = 0
-  end
+    resumeX = width/80
+    resumeY = textBuffer + titleFontScale + textBuffer
+    resumeW = width/2.58
+    resumeH = buttonFontScale
 
-  for i = #explosions, 1, -1 do   -- makes the explosion animation
-    local e = explosions[i]
-    e.x = e.x + (e.dx * dt)*60    -- move the particle
-    e.y = e.y + (e.dy * dt)*60
+    mainMenuX = width/80
+    mainMenuY = textBuffer + titleFontScale + textBuffer + buttonFontScale + textBuffer
+    mainMenuW = width/1.95
+    mainMenuH = buttonFontScale
 
-    e.dx = e.dx / 1.01   -- slow down the particle
-    e.dy = e.dy / 1.01
-
-    e.r = 2 * (5*(math.sqrt(explosion_timer)-((1/7)*explosion_timer - 10))-50)     -- reduce the particle's size
-
-    if e.r < 0 then
-      table.remove(explosions, i)    -- when a particle gets too small, just delete it
+    if love.mouse.isDown(1) and mouseX > resumeX and mouseX < resumeX + resumeW and mouseY > resumeY and mouseY < resumeY + resumeH then
+      if buttonCooldown > 5 then toPrevious() end
+    elseif love.mouse.isDown(1) and mouseX > mainMenuX and mouseX < mainMenuX + mainMenuW and mouseY > mainMenuY and mouseY < mainMenuY + mainMenuH then
+      if buttonCooldown > 5 then
+        toScene("start")
+        hasGenerated = false
+      end
     end
+  elseif scene == "win" then
+
   end
 end
 
 function love.draw()
-  g.setBackgroundColor((1 - random_color.r)/2, (1 - random_color.g)/2, (1 - random_color.b)/2)    -- draw the opposite color of the planets as the background
+  g.setFont(scoreFont)
+  g.print("(" .. love.mouse.getX() .. ", " .. love.mouse.getY() .. ")", 600, textBuffer)
+  if scene == "start" then
+    g.setFont(scoreFont)
+    g.setBackgroundColor(0.1, 0.1, 0.1)
+    g.setColor(0.9, 0.3, 0.3)
+    g.setFont(titleFont)
+    g.print("Orbits", textBuffer, textBuffer)
+    g.setFont(buttonFont)
+    g.print("Start", textBuffer, textBuffer + titleFontScale + textBuffer)
+    g.print("Quit", textBuffer, textBuffer + titleFontScale + textBuffer + buttonFontScale + textBuffer)
 
-  -- if hit then
-  --   g.setColor(0, 0, 0)
-  --   g.rectangle("fill", 0, 0, width, height)
-  --   -- hit = false
-  -- end
+    g.setColor(0.3, 0.9, 0.3)
+    g.circle("fill", titleBall.x, titleBall.y, titleBall.r)
 
-  -- g.setColor(random_color.r, random_color.b, random_color.g)
-  -- g.setFont(myFont)
-  -- g.print("Score: " .. score)   -- draw the score
-
-  for i = 1, #planets, 1 do   -- draw the planets
-    local planet = planets[i]
-    g.setColor(random_color.r, random_color.b, random_color.g)
-    g.circle("fill", planet.x, planet.y, planet.r)
-  end
-
-  for i = 1, #planets, 1 do
-    for j = 1, #planets[i].craters, 1 do
-      local crater = planets[i].craters[j]
-      g.setColor((1 - random_color.r)/2, (1 - random_color.g)/2, (1 - random_color.b)/2)
-      g.circle("fill", crater.x, crater.y, crater.r)
+    g.setColor(0.3, 0.3, 0.9)
+    g.circle("fill", titlePlanet.x, titlePlanet.y, titlePlanet.r)
+  elseif scene == "setup" then
+    g.setColor(0.9, 0.3, 0.3)
+    g.setFont(buttonFont)
+    g.printf("Number of Players:", textBuffer, textBuffer, width - 2*textBuffer)
+    g.setFont(largeFont)
+    g.print(num_players, textBuffer, textBuffer + buttonFontScale + textBuffer)
+    g.setFont(buttonFont)
+    g.print("+", textBuffer + largeFontScale/1.5 + textBuffer, textBuffer + buttonFontScale + textBuffer + largeFontScale/2 - textBuffer/2 - buttonFontScale)
+    g.setFont(titleFont)
+    g.print("-", textBuffer + largeFontScale/1.5 + textBuffer, textBuffer + buttonFontScale + textBuffer + largeFontScale/2 + textBuffer/2)
+    g.print("Go!", textBuffer + largeFontScale/1.5 + textBuffer + titleFontScale/1.5 + textBuffer, textBuffer + buttonFontScale + textBuffer + largeFontScale/2 - titleFontScale/2.5)
+  elseif scene == "loading" then
+    g.setColor(0.9, 0.3, 0.3)
+    g.setFont(buttonFont)
+    if showTip == false then
+      tip = tips[math.random(1, #tips)]
+      showTip = true
     end
+    g.print("Tip:", textBuffer, textBuffer)
+    g.printf(tip, textBuffer, textBuffer + buttonFontScale + textBuffer, width/1.14)
+  elseif scene == "game" then
+    g.setBackgroundColor((1 - random_color.r)/2, (1 - random_color.g)/2, (1 - random_color.b)/2)    -- draw the opposite color of the planets as the background
+
+    g.setFont(scoreFont)
+    g.setColor(random_color.r, random_color.b, random_color.g)
+    g.print("Player " .. turn, textBuffer, textBuffer)
+    if players[turn] ~= nil then
+      g.print("Score: " .. players[turn].score, textBuffer, textBuffer + scoreFontScale + textBuffer)
+    end
+    -- if hit then
+    --   g.setColor(0, 0, 0)
+    --   g.rectangle("fill", 0, 0, width, height)
+    --   -- hit = false
+    -- end
+
+    -- g.setColor(random_color.r, random_color.b, random_color.g)
+    -- g.setFont(myFont)
+    -- g.print("Score: " .. score)   -- draw the score
+
+    for i = 1, #planets, 1 do   -- draw the planets
+      local planet = planets[i]
+      g.setColor(random_color.r, random_color.b, random_color.g)
+      g.circle("fill", planet.x, planet.y, planet.r)
+    end
+
+    for i = 1, #planets, 1 do
+      for j = 1, #planets[i].craters, 1 do
+        local crater = planets[i].craters[j]
+        g.setColor((1 - random_color.r)/2, (1 - random_color.g)/2, (1 - random_color.b)/2)
+        g.circle("fill", crater.x, crater.y, crater.r)
+      end
+    end
+
+    for i = #explosions, 1, -1 do
+      local e = explosions[i]
+      g.setColor(e.red, e.green, e.blue)
+      g.circle("fill", e.x, e.y, e.r)   -- draw the particles
+    end
+
+    for i = 1, #players, 1 do
+      local player = players[i]
+      g.setColor(player.red, player.green, player.blue)
+      g.translate(player.x, player.y)
+      g.rotate(player.rot + math.pi/2)    -- rotate the player so it's perpendicular to the surface of the planet
+      g.translate(-player.x, -player.y)
+      g.rectangle("fill", player.x, player.y, player.w, player.h)   -- draw the player
+      g.origin()
+
+      -- local points = {}
+      -- g.setColor(0, 0, 0)
+      -- g.setPointSize(2)
+      -- g.points(drawCollisionPoints(points, ball, player))
+    end
+
+    if ball.isThrown then
+      g.setColor(0.5, 0.9, 0.7)
+      g.circle("fill", ball.x, ball.y, ball.r)    -- draw the ball
+
+      -- g.line(ball.x, ball.y, ball.x + ball.dx, ball.y + ball.dy)    -- draw a line to represent the ball's velocity
+    end
+
+    for i = #particles, 1, -1 do
+      local p = particles[i]
+      g.circle("fill", p.x, p.y, p.r)   -- draw the particles
+    end
+
+    -- for i = 1, #zones, 1 do
+    --   local zone = zones[i]
+    --   g.rectangle("line", zone.x, zone.y, zone.width, zone.height)    -- draw the zones
+    -- end
+  elseif scene == "pause" then
+    g.setFont(scoreFont)
+    g.setBackgroundColor(0.1, 0.1, 0.1)
+    g.setColor(0.9, 0.3, 0.3)
+    g.setFont(titleFont)
+    g.print("Paused", textBuffer, textBuffer)
+    g.setFont(buttonFont)
+    g.print("Resume", textBuffer, textBuffer + titleFontScale + textBuffer)
+    g.print("Main Menu", textBuffer, textBuffer + titleFontScale + textBuffer + buttonFontScale + textBuffer)
+  elseif scene == "win" then
+
+  end
+end
+
+function toPrevious()
+  buttonCooldown = 0
+  scene = previousScene
+end
+function toScene(newScene)
+  buttonCooldown = 0
+  previousScene = scene
+  scene = newScene
+end
+
+function generate()
+  num_planets = math.floor(math.random(num_players + 2, num_players + 4))   -- generate 2 to 4 more planets than players
+
+  avaiable_zones = zones
+  for i = 1, num_planets, 1 do    -- make planets
+    num = math.random(1, #avaiable_zones)   -- pick a random zone and then take it out of the pool
+    picked_zone = avaiable_zones[num]
+    table.remove(avaiable_zones, num)
+
+    local planet = {}
+    planet.r = math.random(30, 70)    -- make a new planet and place it within that random zone
+    planet.x = math.random(picked_zone.x + planet.r, (picked_zone.x + picked_zone.width) - planet.r)
+    planet.y = math.random(picked_zone.y + planet.r, (picked_zone.y + picked_zone.height) - planet.r)
+    planet.craters = {}
+    table.insert(planets, planet)   -- add the planet to the list
   end
 
-  for i = #explosions, 1, -1 do
-    local e = explosions[i]
-    g.setColor(e.red, e.green, e.blue)
-    g.circle("fill", e.x, e.y, e.r)   -- draw the particles
+  for i = 1, num_players, 1 do    -- make players
+    local player = {}
+    player.w = 10
+    player.h = 20
+    player.x = planets[i].x -player.w/2   -- set player's position to be at top of the i planet
+    player.y = planets[i].y - planets[i].r - player.h
+    player.rot = -math.pi/2
+    player.red = math.random(200, 800)/1000
+    player.green = math.random(200, 800)/1000
+    player.blue = math.random(200, 800)/1000
+    player.planet = i
+    player.score = 0
+    table.insert(players, player)
   end
+end
 
-  for i = 1, #players, 1 do
-    local player = players[i]
-    g.setColor(player.red, player.green, player.blue)
-    g.translate(player.x, player.y)
-    g.rotate(player.rot + math.pi/2)    -- rotate the player so it's perpendicular to the surface of the planet
-    g.translate(-player.x, -player.y)
-    g.rectangle("fill", player.x, player.y, player.w, player.h)   -- draw the player
-    g.origin()
-
-    -- local points = {}
-    -- g.setColor(0, 0, 0)
-    -- g.setPointSize(1)
-    -- g.points(drawCollisionPoints(points, player))
+function love.keypressed(key)
+  if key == "escape" then
+    toScene("pause")
   end
-
-  if ball.isThrown then
-    g.setColor(0.5, 0.9, 0.7)
-    g.circle("fill", ball.x, ball.y, ball.r)    -- draw the ball
-
-    -- g.line(ball.x, ball.y, ball.x + ball.dx, ball.y + ball.dy)    -- draw a line to represent the ball's velocity
-  end
-
-  for i = #particles, 1, -1 do
-    local p = particles[i]
-    g.circle("fill", p.x, p.y, p.r)   -- draw the particles
-  end
-
-  -- for i = 1, #zones, 1 do
-  --   local zone = zones[i]
-  --   g.rectangle("line", zone.x, zone.y, zone.width, zone.height)    -- draw the zones
-  -- end
 end
 
 function love.mousepressed(x, y, button)
-	if button == 1 then
+	if button == 1 and scene == "game" then
     if ball.isThrown == false then    -- throw ball is mouse is pressed
       ball.isThrown = true
       ball.x = players[turn].x
@@ -437,14 +626,6 @@ function love.mousepressed(x, y, button)
       ball.dy = (love.mouse.getY() - ball.y) * throwing_multiplier
     end
   end
-end
-
-function love.keypressed(k)   -- quit if esc pressed
-   if k == 'escape' then
-      love.event.quit()
-   elseif k == 'p' then
-     love.event.quit("restart")
-   end
 end
 
 function distanceBetween(a, b)
@@ -544,10 +725,17 @@ function circleRectRotCollision(circle, rect)
   return false
 end
 
-function drawCollisionPoints(points_table, rect)
+function drawCollisionPoints(points_table, circle, rect)
   resolution = 2
 
   rect.rot = rect.rot + math.pi/2
+
+  for theta = 0, 2*math.pi, math.pi/96 do
+    x = circle.x + (circle.r * math.cos(theta))
+    y = circle.y + (circle.r * math.sin(theta))
+    table.insert(points_table, x)
+    table.insert(points_table, y)
+  end
 
   for i = 0, rect.w*2, resolution do
     local point = {}
