@@ -4,12 +4,12 @@ function love.load()
   width = g.getWidth()    -- get the width and height for future use
   height = g.getHeight()
 
-  scoreFontScale = 40
+  scoreFontScale = width/20
   titleFontScale = width/5.3
   buttonFontScale = width/10.6
   largeFontScale = height/1.26
 
-  textBuffer = 20
+  textBuffer = height/30
 
   scoreFont = g.newFont(scoreFontScale)    -- making a larger font for the score
   titleFont = g.newFont(titleFontScale)
@@ -21,30 +21,8 @@ function love.load()
   num_players = 2
 
   math.randomseed(os.time())    -- seeding random number generation
+
   random_color = {}
-  random_color.r = math.random(300, 700)/1000    -- making a random color which will be the color of the planets
-  random_color.g = math.random(300, 700)/1000
-  random_color.b = math.random(300, 700)/1000
-
-  buffer = 50   -- how much room is between the zones
-  x_zones = 4   -- how many zones along x-axis
-  y_zones = 3   -- how many zones along y-axis
-  zones = {}
-  zone_width = (width - (buffer * (x_zones - 1)))/x_zones   -- find the width and height of each zone based on the screen size, buffer room, and number of zones
-  zone_height = (height - (buffer * (y_zones - 1)))/y_zones
-
-  for x = 0, x_zones - 1, 1 do
-    for y = 0, y_zones - 1, 1 do
-      local zone = {}
-      zone.x = x * (zone_width + buffer)    -- go through each zone and set it x and y coors, and width and height
-      zone.y = y * (zone_height + buffer)
-      zone.width = zone_width
-      zone.height = zone_height
-      table.insert(zones, zone)   -- add the new zone to the list of zones
-    end   -- make zones
-  end
-
-  table.remove(zones, 1)
 
   planets = {}
 
@@ -55,7 +33,7 @@ function love.load()
   ball.y = 0
   ball.dx = 0
   ball.dy = 0
-  ball.r = 5
+  ball.r = width/160
   ball.isThrown = false
 
   score = 0
@@ -98,13 +76,18 @@ function love.load()
           "Remember: you can't go over craters!",
           "You can trap other players by hitting either side of them"}
   tipTimer = 0
+
+  winScreenTimer = 0
+
+  startButtons = {}
+  setupButtons = {}
+  pauseButtons = {}
 end
 
 function love.update(dt)
   buttonCooldown = buttonCooldown + 1
 
   if scene == "start" then
-
     if true then    -- acceleration stuff
       titleBall.x = titleBall.x + (titleBall.dx * dt)    -- add the titleBall's velocity to the position
       titleBall.y = titleBall.y + (titleBall.dy * dt)
@@ -136,38 +119,72 @@ function love.update(dt)
 
     startX = width/80
     startY = textBuffer + titleFontScale + textBuffer
-    startW = width/5
+    startW = width/4
     startH = buttonFontScale
+
+    local button1 = {}
+    button1.x = startX
+    button1.y = startY
+    button1.w = startW
+    button1.h = startH
+    table.insert(startButtons, button1)
 
     quitX = width/80
     quitY = textBuffer + titleFontScale + textBuffer + buttonFontScale + textBuffer
-    quitW = width/4.84
+    quitW = width/4.5
     quitH = buttonFontScale
+
+    local button2 = {}
+    button2.x = quitX
+    button2.y = quitY
+    button2.w = quitW
+    button2.h = quitH
+    table.insert(startButtons, button2)
 
     if love.mouse.isDown(1) and mouseX > startX and mouseX < startX + startW and mouseY > startY and mouseY < startY + startH then
       if buttonCooldown > 5 then toScene("setup") end
     elseif love.mouse.isDown(1) and mouseX > quitX and mouseX < quitX + quitW and mouseY > quitY and mouseY < quitY + quitH then
       if buttonCooldown > 5 then love.event.quit(0) end
     end
-
   elseif scene == "setup" then
     mouseX = love.mouse.getX()
     mouseY = love.mouse.getY()
 
     plusX = textBuffer + largeFontScale/1.5 + textBuffer
-    plusY = textBuffer + buttonFontScale + textBuffer + largeFontScale/2 - textBuffer/2 - buttonFontScale
-    plusW = buttonFontScale
-    plusH = buttonFontScale
+    plusY = textBuffer + buttonFontScale + textBuffer + largeFontScale/2 + textBuffer/2 - buttonFontScale
+    plusW = width/13
+    plusH = width/13
+
+    local button1 = {}
+    button1.x = plusX
+    button1.y = plusY
+    button1.w = plusW
+    button1.h = plusH
+    table.insert(setupButtons, button1)
 
     minusX = textBuffer + largeFontScale/1.5 + textBuffer
-    minusY = textBuffer + buttonFontScale + textBuffer + largeFontScale/2 + textBuffer/2
-    minusW = titleFontScale
-    minusH = titleFontScale
+    minusY = textBuffer + buttonFontScale + textBuffer + largeFontScale/2 + textBuffer*4
+    minusW = width/15
+    minusH = width/15
+
+    local button2 = {}
+    button2.x = minusX
+    button2.y = minusY
+    button2.w = minusW
+    button2.h = minusH
+    table.insert(setupButtons, button2)
 
     goX = textBuffer + largeFontScale/1.5 + textBuffer + titleFontScale/1.5 + textBuffer
     goY = textBuffer + buttonFontScale + textBuffer + largeFontScale/2 - titleFontScale/2.5
-    goW = width/3.08
-    goH = height/5.22
+    goW = width/3
+    goH = width/6
+
+    local button3 = {}
+    button3.x = goX
+    button3.y = goY
+    button3.w = goW
+    button3.h = goH
+    table.insert(setupButtons, button3)
 
     if love.mouse.isDown(1) and mouseX > plusX and mouseX < plusX + plusW and mouseY > plusY and mouseY < plusY + plusH then
       if buttonCooldown > 5 and num_players < 9 then num_players = num_players + 1 end
@@ -176,33 +193,41 @@ function love.update(dt)
       if buttonCooldown > 5 and num_players > 2 then num_players = num_players - 1 end
       buttonCooldown = 0
     elseif love.mouse.isDown(1) and mouseX > goX and mouseX < goX + goW and mouseY > goY and mouseY < goY + goH then
-      if buttonCooldown > 5 then toScene("loading") end
+      if buttonCooldown > 5 then
+        toScene("loading")
+        generatePlayers()
+      end
     end
   elseif scene == "loading" then
     tipTimer = tipTimer + dt
     if tipTimer > 3 then
       hasGenerated = false
+      generateWorld()
       toScene("game")
       tipTimer = 0
     end
   elseif scene == "game" then
     if hasGenerated == false then
-      generate()
+      generateWorld()
       hasGenerated = true
     end
 
     if turn > #players then
       turn = 1
     end
+
     if #players < 2 then
       players[turn].score = players[turn].score + 1
       hasGenerated = false
+      ball.isThrown = false
+      score = 0
+      cooldown_timer = 0
       toScene("win")
     end
 
     local player = players[turn]
 
-    for i = 1, #planets, 1 do
+    for i = 1, #planets, 1 do   -- check for collisions
       local craters = planets[i].craters
       if #craters > 0 then
         for j = 1, #craters, 1 do
@@ -210,7 +235,6 @@ function love.update(dt)
           for k = 1, #players, 1 do
             local player = players[k]
             if player ~= nil and circleRectRotCollision(crater, player) then
-              explode(ball.x, ball.y, 7, 10, 100, 150, -100, 100, player.red, player.green, player.blue, 50)
               table.remove(players, i)
               ball.isThrown = false
               score = 0
@@ -229,6 +253,9 @@ function love.update(dt)
     if #players < 2 then
       players[turn].score = players[turn].score + 1
       hasGenerated = false
+      ball.isThrown = false
+      score = 0
+      cooldown_timer = 0
       toScene("win")
     end
 
@@ -310,7 +337,7 @@ function love.update(dt)
           ball.y = ball.y + (ball.dy * dt)
 
           mass_multiplier = 1000    -- affects gravitational influence
-          G = 10    -- gravitational constant
+          G = 15    -- gravitational constant
 
           vx = ball.x - planet.x    -- get the vector from the ball to the planet
           vy = ball.y - planet.y
@@ -339,7 +366,7 @@ function love.update(dt)
           turn = turn + 1
 
           local crater = {}
-          crater.r = math.random(10, 15)    -- set up a circle for the crater
+          crater.r = math.random(width/80, width/53.33)    -- set up a circle for the crater
           crater.x = ball.x
           crater.y = ball.y
           table.insert(planet.craters, crater)    -- add the crater to the planet's list
@@ -348,7 +375,7 @@ function love.update(dt)
             table.remove(particles, j)
           end
 
-          explode(ball.x, ball.y, 7, 10, 10, 15, -100, 100, 950, 400, 400, 50)
+          explode(ball.x, ball.y, 7, 10, width/80, width/55.3, -100, 100, 950, 400, 400, 50)
 
           local plant = {}
           plant.x = ball.x
@@ -370,7 +397,7 @@ function love.update(dt)
         local particle = {}
         particle.x = ball.x
         particle.y = ball.y
-        particle.r = math.random(3, 5)
+        particle.r = math.random(width/266.6, width/160)
         particle.dx = math.random(-0.5, 0.5)
         particle.dy = math.random(-0.5, 0.5)
         table.insert(particles, particle)     -- add a particle at the ball's position with some random values
@@ -424,13 +451,27 @@ function love.update(dt)
 
     resumeX = width/80
     resumeY = textBuffer + titleFontScale + textBuffer
-    resumeW = width/2.58
+    resumeW = width/2.5
     resumeH = buttonFontScale
+
+    local button1 = {}
+    button1.x = resumeX
+    button1.y = resumeY
+    button1.w = resumeW
+    button1.h = resumeH
+    table.insert(pauseButtons, button1)
 
     mainMenuX = width/80
     mainMenuY = textBuffer + titleFontScale + textBuffer + buttonFontScale + textBuffer
-    mainMenuW = width/1.95
+    mainMenuW = width/1.85
     mainMenuH = buttonFontScale
+
+    local button2 = {}
+    button2.x = mainMenuX
+    button2.y = mainMenuY
+    button2.w = mainMenuW
+    button2.h = mainMenuH
+    table.insert(pauseButtons, button2)
 
     if love.mouse.isDown(1) and mouseX > resumeX and mouseX < resumeX + resumeW and mouseY > resumeY and mouseY < resumeY + resumeH then
       if buttonCooldown > 5 then toPrevious() end
@@ -441,13 +482,16 @@ function love.update(dt)
       end
     end
   elseif scene == "win" then
-
+    winScreenTimer = winScreenTimer + dt
+    if winScreenTimer > 3 then
+      hasGenerated = false
+      toScene("game")
+      winScreenTimer = 0
+    end
   end
 end
 
 function love.draw()
-  g.setFont(scoreFont)
-  g.print("(" .. love.mouse.getX() .. ", " .. love.mouse.getY() .. ")", 600, textBuffer)
   if scene == "start" then
     g.setFont(scoreFont)
     g.setBackgroundColor(0.1, 0.1, 0.1)
@@ -463,6 +507,12 @@ function love.draw()
 
     g.setColor(0.3, 0.3, 0.9)
     g.circle("fill", titlePlanet.x, titlePlanet.y, titlePlanet.r)
+
+    -- for i = 1, #startButtons, 1 do
+    --   local button = startButtons[i]
+    --   g.setColor(0.9, 0.3, 0.3)
+    --   g.rectangle("line", button.x, button.y, button.w, button.h)
+    -- end
   elseif scene == "setup" then
     g.setColor(0.9, 0.3, 0.3)
     g.setFont(buttonFont)
@@ -474,6 +524,12 @@ function love.draw()
     g.setFont(titleFont)
     g.print("-", textBuffer + largeFontScale/1.5 + textBuffer, textBuffer + buttonFontScale + textBuffer + largeFontScale/2 + textBuffer/2)
     g.print("Go!", textBuffer + largeFontScale/1.5 + textBuffer + titleFontScale/1.5 + textBuffer, textBuffer + buttonFontScale + textBuffer + largeFontScale/2 - titleFontScale/2.5)
+
+    -- for i = 1, #setupButtons, 1 do
+    --   local button = setupButtons[i]
+    --   g.setColor(0.9, 0.3, 0.3)
+    --   g.rectangle("line", button.x, button.y, button.w, button.h)
+    -- end
   elseif scene == "loading" then
     g.setColor(0.9, 0.3, 0.3)
     g.setFont(buttonFont)
@@ -488,19 +544,10 @@ function love.draw()
 
     g.setFont(scoreFont)
     g.setColor(random_color.r, random_color.b, random_color.g)
-    g.print("Player " .. turn, textBuffer, textBuffer)
     if players[turn] ~= nil then
+      g.print("Player " .. players[turn].turn, textBuffer, textBuffer)
       g.print("Score: " .. players[turn].score, textBuffer, textBuffer + scoreFontScale + textBuffer)
     end
-    -- if hit then
-    --   g.setColor(0, 0, 0)
-    --   g.rectangle("fill", 0, 0, width, height)
-    --   -- hit = false
-    -- end
-
-    -- g.setColor(random_color.r, random_color.b, random_color.g)
-    -- g.setFont(myFont)
-    -- g.print("Score: " .. score)   -- draw the score
 
     for i = 1, #planets, 1 do   -- draw the planets
       local planet = planets[i]
@@ -524,17 +571,14 @@ function love.draw()
 
     for i = 1, #players, 1 do
       local player = players[i]
-      g.setColor(player.red, player.green, player.blue)
-      g.translate(player.x, player.y)
-      g.rotate(player.rot + math.pi/2)    -- rotate the player so it's perpendicular to the surface of the planet
-      g.translate(-player.x, -player.y)
-      g.rectangle("fill", player.x, player.y, player.w, player.h)   -- draw the player
-      g.origin()
-
-      -- local points = {}
-      -- g.setColor(0, 0, 0)
-      -- g.setPointSize(2)
-      -- g.points(drawCollisionPoints(points, ball, player))
+      if player.x ~= nil then
+        g.setColor(player.red, player.green, player.blue)
+        g.translate(player.x, player.y)
+        g.rotate(player.rot + math.pi/2)    -- rotate the player so it's perpendicular to the surface of the planet
+        g.translate(-player.x, -player.y)
+        g.rectangle("fill", player.x, player.y, player.w, player.h)   -- draw the player
+        g.origin()
+      end
     end
 
     if ball.isThrown then
@@ -562,8 +606,34 @@ function love.draw()
     g.setFont(buttonFont)
     g.print("Resume", textBuffer, textBuffer + titleFontScale + textBuffer)
     g.print("Main Menu", textBuffer, textBuffer + titleFontScale + textBuffer + buttonFontScale + textBuffer)
-  elseif scene == "win" then
 
+    -- for i = 1, #pauseButtons, 1 do
+    --   local button = pauseButtons[i]
+    --   g.setColor(0.9, 0.3, 0.3)
+    --   g.rectangle("line", button.x, button.y, button.w, button.h)
+    -- end
+  elseif scene == "win" then
+    g.setFont(scoreFont)
+    g.setBackgroundColor(0.1, 0.1, 0.1)
+    g.setColor(0.9, 0.3, 0.3)
+    g.setFont(buttonFont)
+    g.print("Player " .. players[turn].turn, textBuffer, textBuffer)
+    g.print("wins!", textBuffer, textBuffer + buttonFontScale + textBuffer)
+
+    local planet = {}
+    planet.x = width/1.3
+    planet.y = height/0.75
+    planet.r = height/1.5
+    g.setColor(random_color.r, random_color.b, random_color.g)
+    g.circle("fill", planet.x, planet.y, planet.r)
+
+    local player = {}
+    player.w = width/8
+    player.h = width/3
+    player.x = planet.x - player.w/2
+    player.y = planet.y - planet.r - player.h
+    g.setColor(players[turn].red, players[turn].green, players[turn].blue)
+    g.rectangle("fill", player.x, player.y, player.w, player.h)
   end
 end
 
@@ -577,8 +647,55 @@ function toScene(newScene)
   scene = newScene
 end
 
-function generate()
+function generatePlayers()
+  players = nil
+  players = {}
+  for i = 1, num_players, 1 do    -- make players
+    local player = {}
+    player.w = width/80
+    player.h = player.w*2
+    player.x = -10
+    player.y = -10
+    player.rot = 0
+    player.red = math.random(200, 800)/1000
+    player.green = math.random(200, 800)/1000
+    player.blue = math.random(200, 800)/1000
+    player.planet = i
+    player.score = 0
+    player.turn = i
+    table.insert(players, player)
+  end
+end
+
+function generateWorld()
+  random_color.r = math.random(300, 700)/1000    -- making a random color which will be the color of the planets
+  random_color.g = math.random(300, 700)/1000
+  random_color.b = math.random(300, 700)/1000
+
   num_planets = math.floor(math.random(num_players + 2, num_players + 4))   -- generate 2 to 4 more planets than players
+
+  planets = nil
+  planets = {}
+
+  buffer = 50   -- how much room is between the zones
+  x_zones = 4   -- how many zones along x-axis
+  y_zones = 3   -- how many zones along y-axis
+  zones = {}
+  zone_width = (width - (buffer * (x_zones - 1)))/x_zones   -- find the width and height of each zone based on the screen size, buffer room, and number of zones
+  zone_height = (height - (buffer * (y_zones - 1)))/y_zones
+
+  for x = 0, x_zones - 1, 1 do
+    for y = 0, y_zones - 1, 1 do
+      local zone = {}
+      zone.x = x * (zone_width + buffer)    -- go through each zone and set it x and y coors, and width and height
+      zone.y = y * (zone_height + buffer)
+      zone.width = zone_width
+      zone.height = zone_height
+      table.insert(zones, zone)   -- add the new zone to the list of zones
+    end   -- make zones
+  end
+
+  table.remove(zones, 1)
 
   avaiable_zones = zones
   for i = 1, num_planets, 1 do    -- make planets
@@ -587,7 +704,7 @@ function generate()
     table.remove(avaiable_zones, num)
 
     local planet = {}
-    planet.r = math.random(30, 70)    -- make a new planet and place it within that random zone
+    planet.r = math.random(width/26.6, width/8.88)    -- make a new planet and place it within that random zone
     planet.x = math.random(picked_zone.x + planet.r, (picked_zone.x + picked_zone.width) - planet.r)
     planet.y = math.random(picked_zone.y + planet.r, (picked_zone.y + picked_zone.height) - planet.r)
     planet.craters = {}
@@ -595,18 +712,11 @@ function generate()
   end
 
   for i = 1, num_players, 1 do    -- make players
-    local player = {}
-    player.w = 10
-    player.h = 20
-    player.x = planets[i].x -player.w/2   -- set player's position to be at top of the i planet
-    player.y = planets[i].y - planets[i].r - player.h
-    player.rot = -math.pi/2
-    player.red = math.random(200, 800)/1000
-    player.green = math.random(200, 800)/1000
-    player.blue = math.random(200, 800)/1000
-    player.planet = i
-    player.score = 0
-    table.insert(players, player)
+    if players[i] ~= nil then
+      players[i].x = planets[i].x - players[i].w/2   -- set player's position to be at top of the i planet
+      players[i].y = planets[i].y - planets[i].r - players[i].h
+      players[i].rot = -math.pi/2
+    end
   end
 end
 
