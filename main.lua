@@ -89,7 +89,7 @@ function love.load()
   playerList = {}
 
   music = love.audio.newSource( 'Ben_Game_Jan.mp3', 'stream' )
-  music:setLooping( true ) --so it doesnt stop
+  music:setLooping(true) --so it doesnt stop
   music:play()
 end
 
