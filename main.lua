@@ -73,8 +73,9 @@ function love.load()
   showTip = false
   tips = {"Hit players at their feet to kill them",
           "Use 'a' and 'd' to move around your planet!",
-          "Remember: you can't go over craters!",
-          "You can trap other players by hitting either side of them"}
+          "Remember, you can't go over craters!",
+          "You can trap other players by hitting either side of them",
+          "Your projectile will disappear after 5 seconds, so watch out!"}
   tipTimer = 0
 
   winScreenTimer = 0
@@ -82,6 +83,14 @@ function love.load()
   startButtons = {}
   setupButtons = {}
   pauseButtons = {}
+
+  playerWon = {}
+
+  playerList = {}
+
+  music = love.audio.newSource( 'Ben_Game_Jan.mp3', 'stream' )
+  music:setLooping( true ) --so it doesnt stop
+  music:play()
 end
 
 function love.update(dt)
@@ -142,6 +151,7 @@ function love.update(dt)
     table.insert(startButtons, button2)
 
     if love.mouse.isDown(1) and mouseX > startX and mouseX < startX + startW and mouseY > startY and mouseY < startY + startH then
+      generatePlayers()
       if buttonCooldown > 5 then toScene("setup") end
     elseif love.mouse.isDown(1) and mouseX > quitX and mouseX < quitX + quitW and mouseY > quitY and mouseY < quitY + quitH then
       if buttonCooldown > 5 then love.event.quit(0) end
@@ -195,7 +205,6 @@ function love.update(dt)
     elseif love.mouse.isDown(1) and mouseX > goX and mouseX < goX + goW and mouseY > goY and mouseY < goY + goH then
       if buttonCooldown > 5 then
         toScene("loading")
-        generatePlayers()
       end
     end
   elseif scene == "loading" then
@@ -203,10 +212,18 @@ function love.update(dt)
     if tipTimer > 3 then
       hasGenerated = false
       generateWorld()
+      revivePlayers()
       toScene("game")
       tipTimer = 0
     end
   elseif scene == "game" then
+    lastTurn = turn - 1
+    if lastTurn < 1 then lastTurn = #players end
+
+    if turn > #players then
+      turn = 1
+    end
+
     if hasGenerated == false then
       generateWorld()
       hasGenerated = true
@@ -214,15 +231,6 @@ function love.update(dt)
 
     if turn > #players then
       turn = 1
-    end
-
-    if #players < 2 then
-      players[turn].score = players[turn].score + 1
-      hasGenerated = false
-      ball.isThrown = false
-      score = 0
-      cooldown_timer = 0
-      toScene("win")
     end
 
     local player = players[turn]
@@ -239,7 +247,6 @@ function love.update(dt)
               ball.isThrown = false
               score = 0
               cooldown_timer = 0
-              turn = turn + 1
               hit = true
             end
           end
@@ -247,15 +254,20 @@ function love.update(dt)
       end   -- detect player collisions with crater and kill player
     end
 
-    if turn > #players then
-      turn = 1
-    end
+
     if #players < 2 then
-      players[turn].score = players[turn].score + 1
+      if players[turn] == nil then
+        players[lastTurn].score = players[lastTurn].score + 1
+        playerWon = players[lastTurn]
+      else
+        players[turn].score = players[turn].score + 1
+        playerWon = players[turn]
+      end
       hasGenerated = false
       ball.isThrown = false
       score = 0
       cooldown_timer = 0
+      winScreenTimer = 0
       toScene("win")
     end
 
@@ -280,7 +292,7 @@ function love.update(dt)
           new_point.x = (planets[player.planet].r * math.cos(player.rot - 2*dt)) + planets[player.planet].x   -- calculate your new coordinate (at left foot of player)
           new_point.y = (planets[player.planet].r * math.sin(player.rot - 2*dt)) + planets[player.planet].y
 
-          if distanceBetween(new_point, crater) < crater.r then   -- check if it's inside the crater
+          if distanceBetween(new_point, crater) < crater.r + 1 then   -- check if it's inside the crater
             move = false    -- if it is, set move to false
           end
         end
@@ -304,7 +316,7 @@ function love.update(dt)
           new_point.x = (planets[player.planet].r * math.cos(player.rot + 2*dt + (4*math.pi/planets[player.planet].r))) + planets[player.planet].x    -- calculates right foot of player if moved
           new_point.y = (planets[player.planet].r * math.sin(player.rot + 2*dt + (4*math.pi/planets[player.planet].r))) + planets[player.planet].y
 
-          if distanceBetween(new_point, crater) < crater.r then
+          if distanceBetween(new_point, crater) < crater.r + player.w/2 then
             move = false
           end
         end
@@ -485,6 +497,10 @@ function love.update(dt)
     winScreenTimer = winScreenTimer + dt
     if winScreenTimer > 3 then
       hasGenerated = false
+      generateWorld()
+      revivePlayers()
+      turn = 1
+      ball.isThrown = false
       toScene("game")
       winScreenTimer = 0
     end
@@ -617,7 +633,7 @@ function love.draw()
     g.setBackgroundColor(0.1, 0.1, 0.1)
     g.setColor(0.9, 0.3, 0.3)
     g.setFont(buttonFont)
-    g.print("Player " .. players[turn].turn, textBuffer, textBuffer)
+    g.print("Player " .. playerWon.turn, textBuffer, textBuffer)
     g.print("wins!", textBuffer, textBuffer + buttonFontScale + textBuffer)
 
     local planet = {}
@@ -632,7 +648,7 @@ function love.draw()
     player.h = width/3
     player.x = planet.x - player.w/2
     player.y = planet.y - planet.r - player.h
-    g.setColor(players[turn].red, players[turn].green, players[turn].blue)
+    g.setColor(playerWon.red, playerWon.green, playerWon.blue)
     g.rectangle("fill", player.x, player.y, player.w, player.h)
   end
 end
@@ -647,8 +663,16 @@ function toScene(newScene)
   scene = newScene
 end
 
-function generatePlayers()
+function revivePlayers()
   players = nil
+  players = playerList
+end
+
+function generatePlayers()
+  for i = #players, 1, -1 do
+    players[i] = nil
+  end
+
   players = {}
   for i = 1, num_players, 1 do    -- make players
     local player = {}
@@ -664,6 +688,7 @@ function generatePlayers()
     player.score = 0
     player.turn = i
     table.insert(players, player)
+    table.insert(playerList, player)
   end
 end
 
@@ -704,7 +729,7 @@ function generateWorld()
     table.remove(avaiable_zones, num)
 
     local planet = {}
-    planet.r = math.random(width/26.6, width/8.88)    -- make a new planet and place it within that random zone
+    planet.r = math.random(width/25, width/10)    -- make a new planet and place it within that random zone
     planet.x = math.random(picked_zone.x + planet.r, (picked_zone.x + picked_zone.width) - planet.r)
     planet.y = math.random(picked_zone.y + planet.r, (picked_zone.y + picked_zone.height) - planet.r)
     planet.craters = {}
