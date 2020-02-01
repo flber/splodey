@@ -20,3 +20,122 @@ dead players length after revive: 0
 players length at start of game: 2
 ----------headed to pause----------
 ----------headed to start----------
+----------headed to setup----------
+----------headed to loading----------
+----------headed to game----------
+players length at start of game: 2
+players length at to win: 1
+----------headed to win----------
+players length before revive: 1
+dead players length before revive: 1
+players length after revive: 2
+dead players length after revive: 0
+----------headed to game----------
+players length at start of game: 2
+players length at to win: 1
+----------headed to win----------
+players length before revive: 1
+dead players length before revive: 1
+players length after revive: 2
+dead players length after revive: 0
+----------headed to game----------
+players length at start of game: 2
+----------headed to pause----------
+----------headed to start----------
+----------headed to setup----------
+----------headed to loading----------
+----------headed to game----------
+players length at start of game: 2
+----------headed to setup----------
+----------headed to loading----------
+----------headed to game----------
+players length at start of game: 2
+players length at to win: 1
+----------headed to win----------
+players length before revive: 1
+dead players length before revive: 1
+players length after revive: 2
+dead players length after revive: 0
+----------headed to game----------
+players length at start of game: 2
+players length at to win: 1
+----------headed to win----------
+players length before revive: 1
+dead players length before revive: 1
+players length after revive: 2
+dead players length after revive: 0
+----------headed to game----------
+players length at start of game: 2
+players length at to win: 1
+----------headed to win----------
+players length before revive: 1
+dead players length before revive: 1
+players length after revive: 2
+dead players length after revive: 0
+----------headed to game----------
+players length at start of game: 2
+players length at to win: 1
+----------headed to win----------
+----------headed to pause----------
+----------headed to start----------
+----------headed to setup----------
+----------headed to loading----------
+----------headed to game----------
+players length at start of game: 2
+----------headed to setup----------
+----------headed to loading----------
+----------headed to game----------
+players length at start of game: 2
+players length at to win: 1
+----------headed to win----------
+players length before revive: 1
+dead players length before revive: 1
+players length after revive: 2
+dead players length after revive: 0
+----------headed to game----------
+players length at start of game: 2
+players length at to win: 1
+----------headed to win----------
+players length before revive: 1
+dead players length before revive: 1
+players length after revive: 2
+dead players length after revive: 0
+----------headed to game----------
+players length at start of game: 2
+----------headed to pause----------
+----------headed to start----------
+----------headed to setup----------
+----------headed to loading----------
+----------headed to game----------
+players length at start of game: 4
+----------headed to pause----------
+----------headed to start----------
+----------headed to setup----------
+----------headed to loading----------
+----------headed to game----------
+players length at start of game: 4
+players length at to win: 1
+----------headed to win----------
+players length before revive: 1
+dead players length before revive: 4
+players length after revive: 5
+dead players length after revive: 0
+----------headed to game----------
+players length at start of game: 5
+players length at to win: 1
+----------headed to win----------
+players length before revive: 1
+dead players length before revive: 4
+players length after revive: 5
+dead players length after revive: 0
+----------headed to game----------
+players length at start of game: 5
+----------headed to pause----------
+----------headed to pause----------
+----------going back to start----------
+----------going back to pause----------
+----------going back to start----------
+----------headed to setup----------
+----------headed to loading----------
+----------headed to game----------
+players length at start of game: 4

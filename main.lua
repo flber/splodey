@@ -267,18 +267,14 @@ function love.update(dt)
     end
 
     if #players < 2 then
-      if players[turn] == nil then
-        players[lastTurn].score = players[lastTurn].score + 1
-        playerWon = players[lastTurn]
-      else
-        players[turn].score = players[turn].score + 1
-        playerWon = players[turn]
-      end
+      players[1].score = players[1].score + 1
+      playerWon = players[1]
       hasGenerated = false
       ball.isThrown = false
       score = 0
       cooldown_timer = 0
       winScreenTimer = 0
+      turn = 1
       debug:write("players length at to win: " .. #players .. "\n")
       toScene("win")
     end
