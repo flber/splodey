@@ -86,11 +86,19 @@ function love.load()
 
   playerWon = {}
 
-  playerList = {}
+  deadPlayers = {}
 
   music = love.audio.newSource( 'Ben_Game_Jan.mp3', 'stream' )
   music:setLooping(true) --so it doesnt stop
   music:play()
+
+  firstGame = true
+
+  testNumPlayers = -1
+
+  debug = io.open("debug.txt", "a")
+
+  scenes = {"start"}
 end
 
 function love.update(dt)
@@ -123,6 +131,8 @@ function love.update(dt)
       titleBall.dx = titleBall.dx + acceleration2x*dt
     end
 
+    firstGame = true
+
     mouseX = love.mouse.getX()
     mouseY = love.mouse.getY()
 
@@ -151,7 +161,6 @@ function love.update(dt)
     table.insert(startButtons, button2)
 
     if love.mouse.isDown(1) and mouseX > startX and mouseX < startX + startW and mouseY > startY and mouseY < startY + startH then
-      generatePlayers()
       if buttonCooldown > 5 then toScene("setup") end
     elseif love.mouse.isDown(1) and mouseX > quitX and mouseX < quitX + quitW and mouseY > quitY and mouseY < quitY + quitH then
       if buttonCooldown > 5 then love.event.quit(0) end
@@ -204,15 +213,17 @@ function love.update(dt)
       buttonCooldown = 0
     elseif love.mouse.isDown(1) and mouseX > goX and mouseX < goX + goW and mouseY > goY and mouseY < goY + goH then
       if buttonCooldown > 5 then
+        generatePlayers()
         toScene("loading")
       end
     end
   elseif scene == "loading" then
+    firstGame = false
+
     tipTimer = tipTimer + dt
     if tipTimer > 3 then
       hasGenerated = false
       generateWorld()
-      revivePlayers()
       toScene("game")
       tipTimer = 0
     end
@@ -226,6 +237,7 @@ function love.update(dt)
 
     if hasGenerated == false then
       generateWorld()
+      debug:write("players length at start of game: " .. #players .. "\n")
       hasGenerated = true
     end
 
@@ -243,7 +255,7 @@ function love.update(dt)
           for k = 1, #players, 1 do
             local player = players[k]
             if player ~= nil and circleRectRotCollision(crater, player) then
-              table.remove(players, i)
+              table.insert(deadPlayers, table.remove(players, i))
               ball.isThrown = false
               score = 0
               cooldown_timer = 0
@@ -253,7 +265,6 @@ function love.update(dt)
         end
       end   -- detect player collisions with crater and kill player
     end
-
 
     if #players < 2 then
       if players[turn] == nil then
@@ -268,6 +279,7 @@ function love.update(dt)
       score = 0
       cooldown_timer = 0
       winScreenTimer = 0
+      debug:write("players length at to win: " .. #players .. "\n")
       toScene("win")
     end
 
@@ -301,7 +313,6 @@ function love.update(dt)
           player.rot = player.rot - 2*dt
         end
       end
-
     elseif love.keyboard.isDown("d") then   -- rotate the player clockwise around the planet (same as going counter clockwise)
       if #planets[player.planet].craters == 0 then
         player.rot = player.rot + 2*dt
@@ -501,6 +512,7 @@ function love.update(dt)
       revivePlayers()
       turn = 1
       ball.isThrown = false
+      testNumPlayers = #players
       toScene("game")
       winScreenTimer = 0
     end
@@ -655,25 +667,45 @@ end
 
 function toPrevious()
   buttonCooldown = 0
+  if previousScene == scene then
+    for i = #scenes, 1, -1 do
+      if scenes[i] ~= scene then
+        goTo = scenes[i]
+      end
+    end
+    previousScene = scene
+    scene = goTo
+    table.insert(scenes, scene)
+    debug:write("----------going back to " .. scene .. "----------\n")
+  end
+  tempCurrent = scene
   scene = previousScene
+  previousScene = tempCurrent
+  table.insert(scenes, scene)
+  debug:write("----------going back to " .. scene .. "----------\n")
 end
 function toScene(newScene)
+  table.insert(scenes, newScene)
   buttonCooldown = 0
   previousScene = scene
   scene = newScene
+  debug:write("----------headed to " .. scene .. "----------\n")
 end
 
 function revivePlayers()
-  players = nil
-  players = playerList
+  debug:write("players length before revive: " .. #players .. "\n")
+  debug:write("dead players length before revive: " .. #deadPlayers .. "\n")
+  for i = #deadPlayers, 1, -1 do
+    table.insert(players, table.remove(deadPlayers, i))
+  end
+  debug:write("players length after revive: " .. #players .. "\n")
+  debug:write("dead players length after revive: " .. #deadPlayers .. "\n")
 end
 
 function generatePlayers()
-  for i = #players, 1, -1 do
-    players[i] = nil
-  end
-
+  players = nil
   players = {}
+
   for i = 1, num_players, 1 do    -- make players
     local player = {}
     player.w = width/80
@@ -688,7 +720,10 @@ function generatePlayers()
     player.score = 0
     player.turn = i
     table.insert(players, player)
-    table.insert(playerList, player)
+    if firstGame then
+      table.insert(deadPlayers, player)
+      debug:write("Added to deadPlayers\n")
+    end
   end
 end
 
