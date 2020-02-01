@@ -720,10 +720,6 @@ function generatePlayers()
     player.score = 0
     player.turn = i
     table.insert(players, player)
-    if firstGame then
-      table.insert(deadPlayers, player)
-      debug:write("Added to deadPlayers\n")
-    end
   end
 end
 
@@ -771,11 +767,12 @@ function generateWorld()
     table.insert(planets, planet)   -- add the planet to the list
   end
 
-  for i = 1, num_players, 1 do    -- make players
+  for i = 1, #players, 1 do    -- make players
     if players[i] ~= nil then
-      players[i].x = planets[i].x - players[i].w/2   -- set player's position to be at top of the i planet
-      players[i].y = planets[i].y - planets[i].r - players[i].h
-      players[i].rot = -math.pi/2
+      local player = players[i]
+      player.x = planets[player.planet].x - player.w/2   -- set player's position to be at top of the i planet
+      player.y = planets[player.planet].y - planets[player.planet].r - player.h
+      player.rot = -math.pi/2
     end
   end
 end
