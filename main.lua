@@ -254,8 +254,8 @@ function love.update(dt)
           local crater = craters[j]
           for k = 1, #players, 1 do
             local player = players[k]
-            if player ~= nil and circleRectRotCollision(crater, player) then
-              table.insert(deadPlayers, table.remove(players, i))
+            if player ~= nil and circleRectRotCollision(crater, player) then   -- detect player collisions with crater and kill player
+              table.insert(deadPlayers, table.remove(players, k))
               ball.isThrown = false
               score = 0
               cooldown_timer = 0
@@ -263,12 +263,14 @@ function love.update(dt)
             end
           end
         end
-      end   -- detect player collisions with crater and kill player
+      end
     end
 
     if #players < 2 then
       players[1].score = players[1].score + 1
+      debug:write("players[1] turn: " .. players[1].turn .. "\n")
       playerWon = players[1]
+      debug:write("playerWon turn: " .. playerWon.turn .. "\n")
       hasGenerated = false
       ball.isThrown = false
       score = 0
@@ -696,6 +698,7 @@ function revivePlayers()
   end
   debug:write("players length after revive: " .. #players .. "\n")
   debug:write("dead players length after revive: " .. #deadPlayers .. "\n")
+  turn = 1
 end
 
 function generatePlayers()
