@@ -24,3 +24,33 @@ dead players length after revive: 0
 players length at start of game: 4
 ----------headed to pause----------
 ----------headed to start----------
+----------headed to setup----------
+----------headed to loading----------
+----------headed to game----------
+players length at start of game: 4
+----------headed to pause----------
+----------headed to start----------
+----------headed to setup----------
+----------headed to loading----------
+----------headed to game----------
+players length at start of game: 4
+players[1] turn: 4
+playerWon turn: 4
+players length at to win: 1
+----------headed to win----------
+players length before revive: 1
+dead players length before revive: 3
+players length after revive: 4
+dead players length after revive: 0
+----------headed to game----------
+players length at start of game: 4
+----------headed to setup----------
+----------headed to loading----------
+----------headed to game----------
+players length at start of game: 3
+----------headed to pause----------
+----------headed to start----------
+----------headed to setup----------
+----------headed to loading----------
+----------headed to game----------
+players length at start of game: 2
